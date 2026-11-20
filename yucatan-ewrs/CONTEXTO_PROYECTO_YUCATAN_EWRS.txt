@@ -1,0 +1,2227 @@
+================================================================================
+CONTEXTO COMPLETO DEL PROYECTO: YUCATÁN EWRS
+(Yucatán Hurricane Early Warning & Response System)
+Documento de referencia completo (Contexto + Arquitectura + Todo el Código)
+Preparado para generar una presentación con IA
+================================================================================
+
+INSTRUCCIONES PARA LA IA QUE RECIBA ESTE ARCHIVO:
+-------------------------------------------------
+Este archivo contiene absolutamente todo el contexto conceptual, técnico,
+operativo y el código fuente íntegro del proyecto "Yucatán EWRS".
+Tu objetivo es ayudar a crear una presentación (estructura de diapositivas,
+puntos clave, narrativa, diagramas conceptuales y guion de exposición) clara,
+convincente y rigurosa basada en este sistema real.
+
+================================================================================
+1. RESUMEN EJECUTIVO Y TESIS DEL PROYECTO
+================================================================================
+
+- Nombre del proyecto: Yucatán EWRS (Yucatán Hurricane Early Warning & Response System).
+- Tipo de proyecto: MVP / Prototipo funcional interactivo construido en Python + Streamlit para la Coordinación Estatal de Protección Civil de Yucatán (PROCIVY), desarrollado en el contexto de una presentación de Economía Digital.
+- Problema que aborda:
+  Cuando un huracán impacta la península de Yucatán, existen cuatro grandes retos:
+  1. Granularidad: Los boletines suelen ser regionales o estatales, pero el riesgo real varía drásticamente por municipio según elevación, vulnerabilidad a inundación, cercanía a la costa, capacidad de albergues y barreras lingüísticas.
+  2. Idioma y canales: Gran parte de la población vulnerable en municipios del interior y oriente (como Tekax, Valladolid, Tizimín) habla Maya Yucateco, mientras que en zonas costeras y urbanas hay población hispanohablante y turistas/residentes angloparlantes. Redactar alertas manuales para múltiples canales (SMS Cell Broadcast, WhatsApp, Radio Comunitaria) y en 3 idiomas toma entre 30 y 60 minutos críticos.
+  3. Triaje post-impacto: Tras el impacto, llegan decenas de reportes simultáneos (pacientes de diálisis aislados, carreteras bloqueadas, subestaciones inundadas, familias en techos) con recursos de brigadas limitados (Cruz Roja, SEMAR, SEDENA Plan DN-III-E, CFE, DIF/PROCIVY).
+  4. Fragilidad tecnológica (Apagones y caída de telecomunicaciones): Durante un huracán categoría 4 o 5, la red eléctrica y el internet comercial fallan. Un sistema que dependa 100% de la nube colapsa justo cuando más se necesita.
+
+- Tesis central ("Principio de Diseño"):
+  "La Inteligencia Artificial es una CAPA DE AUMENTO (augmentation layer), NO un reemplazo."
+  Los protocolos simples y probados (Cell Broadcast SMS, radio comunitaria AM/FM con generador, mapas impresos, perifoneo, radio VHF/HF y mantenimiento físico de pozos de absorción/drenaje) siguen siendo la columna vertebral. La capa de IA acelera y mejora la precisión cuando hay conectividad, y se degrada con gracia (graceful degradation) a ejecución local, plantillas preaprobadas offline y decisión humana (Human-in-the-Loop) cuando fallan la electricidad y las telecomunicaciones.
+
+================================================================================
+2. ARQUITECTURA FUNCIONAL: LAS 4 PESTAÑAS Y LA BARRA LATERAL
+================================================================================
+
+BARRA LATERAL (Simulador de Escenarios y Controles Operativos):
+- Permite simular en tiempo real un huracán ajustando 4 parámetros:
+  1. Categoría Saffir-Simpson (1 a 5).
+  2. Lluvia acumulada en 24 horas (50 a 500 mm).
+  3. Marea de tormenta / Storm surge (0.0 a 6.0 metros).
+  4. Zona de impacto / trayectoria (North Coast, West Coast, East Coast, Inland).
+- Controles de resiliencia:
+  * "Offline / Demo Mode": Fuerza el uso de plantillas locales preaprobadas sin llamar a APIs externas.
+  * "Simulate Power & Telecom Outage": Simula la caída de energía y telecomunicaciones comerciales para demostrar cómo responde y se degrada cada componente del sistema.
+  * "Map renderer": Cambia entre mapa de calles online (OpenStreetMap) y mapa vectorial offline que no requiere servidor de teselas.
+- "Model card" desplegable: Muestra las métricas reales del modelo RandomForest entrenado (R², MAE, tamaño de entrenamiento/prueba y gráfico de importancia global de variables).
+
+PESTAÑA 1: 🗺️ Hyperlocal Risk Map (Mapa de Riesgo Hiperlocal)
+- Qué hace: Evalúa en tiempo real el riesgo (0–100) y nivel (Low, Moderate, High, Critical) para 8 municipios clave de Yucatán:
+  Progreso, Celestún, Hunucmá (Sisal), Río Lagartos, Tizimín (El Cuyo), Mérida, Valladolid y Tekax.
+- Indicadores KPI superiores:
+  1. Municipios en riesgo Alto/Crítico.
+  2. Población expuesta estimada a peligros mortales.
+  3. Estado de capacidad de albergues (% de utilización, camas demandadas vs. capacidad total, y alerta de municipios rebasados).
+  4. Municipio de mayor riesgo actual y su puntaje.
+- Visualizaciones:
+  * Mapa interactivo con la trayectoria del huracán (línea morada) y burbujas por municipio escaladas y coloreadas por nivel de riesgo (con fallback automático a mapa vectorial offline).
+  * Gráfico de barras horizontal con el ranking de riesgo (0–100) y umbrales (25, 50, 75).
+  * Tabla desplegable de Explicabilidad ML ("Top 3 ML risk drivers per municipality"): Muestra para cada municipio cuáles son los 3 factores principales que impulsan su puntaje de riesgo en ese escenario (calculados mediante análisis de oclusión local).
+
+PESTAÑA 2: 📣 Multilingual Alert Studio (Estudio de Alertas Multilingües)
+- Qué hace: Genera alertas de emergencia adaptadas al municipio seleccionado y a su nivel de riesgo actual en 3 IDIOMAS:
+  1. Español (es)
+  2. Maya Yucateco (yua)
+  3. Inglés (en)
+  Y para 3 CANALES simultáneos por idioma (9 mensajes en total):
+  1. Cell Broadcast SMS (estrictamente <= 160 caracteres).
+  2. Mensaje comunitario de WhatsApp (con formato, pasos accionables y factor principal de riesgo).
+  3. Guion de Radio Comunitaria de 30 segundos (~70–80 palabras, incluye conteo de palabras y tiempo estimado de lectura en voz alta).
+- Cómo funciona por dentro:
+  * Si el sistema está Online y tiene API key configurada (Google Gemini `gemini-2.5-flash` u OpenAI `gpt-4o-mini`), construye un prompt estructurado con el perfil de riesgo del municipio y solicita una salida JSON estricta.
+  * Si está en modo Offline, si se simula apagón de telecomunicaciones, si no hay API key o si la API falla/tarda más de 20 segundos, hace fallback automático e instantáneo a la biblioteca de plantillas preaprobadas (`data/fallback_alerts.json`).
+  * Incluye una advertencia ética/operativa indispensable: los textos en Maya Yucateco generados o asistidos por máquina son borradores que requieren validación por hablantes nativos e INDEMAYA antes de su difusión oficial.
+
+PESTAÑA 3: 🚑 Post-Impact Triage (Triaje Post-Impacto con Human-in-the-Loop)
+- Qué hace: Prioriza 10 incidentes simulados post-impacto y sugiere la asignación óptima de brigadas disponibles, exigiendo siempre la aprobación o modificación de un operador humano de PROCIVY.
+- Cómo calcula la prioridad (0–100):
+  Combina pesos ponderados:
+  * Severidad del incidente (1–5): 45%
+  * Personas vulnerables afectadas (escala logarítmica para que 4 pacientes de diálisis no sean opacados por un corte eléctrico masivo): 20%
+  * Criticidad de infraestructura (1–5): 15%
+  * Nivel de aislamiento/acceso (open=0.2, restricted=0.6, cut_off=1.0): 15%
+  * Riesgo IA actual del municipio: 5%
+  * Regla de salvamento de vida (Life-safety bonus): Si la severidad es 5 (peligro inminente de muerte), suma +10 puntos extra para saltar al frente de la cola.
+- Asignación de brigadas (Greedy Allocator):
+  Asigna unidades según prioridad descendente entre el inventario limitado de brigadas (Medical Evacuation, Water Rescue, Road Clearance, Power Restoration, Shelter Logistics, Search & Assessment). Si el tipo requerido se agota, busca una brigada alternativa compatible; si no quedan, lo pone en espera.
+- Flujo Human-in-the-Loop (HITL):
+  Ninguna unidad se desplaza sin firma humana. El operador puede aprobar ("Approve") la sugerencia de la IA o sobreescribirla ("Override") eligiendo otra brigada y registrando la razón (ej. conocimiento local de rutas abiertas). Todas las decisiones quedan registradas con marca de tiempo en el registro de auditoría ("Dispatch audit log").
+
+PESTAÑA 4: ⚖️ Critical Check (Evaluación Crítica: Protocolos Base vs. Capa de IA)
+- Qué hace: Compara lado a lado la resiliencia de 5 protocolos base no-IA contra 6 componentes de la capa de IA bajo dos condiciones: Operación Normal vs. Apagón Eléctrico y de Telecomunicaciones.
+- Resultado cuantitativo:
+  * En operación normal: Ambos operan al 100%.
+  * Durante un apagón y caída de telecomunicaciones:
+    - Los protocolos base retienen el 90% de su capacidad (la radio comunitaria con generador, los mapas impresos, el drenaje físico y el perifoneo/VHF siguen al 100%; Cell Broadcast se degrada al 50% mientras duran las baterías de respaldo de las antenas de 4 a 8 h).
+    - La capa de IA cae al 33% de su capacidad (WhatsApp y la recepción digital de incidentes quedan Offline [0%]; el modelo ML local, las alertas con fallback a plantillas, el mapa vectorial offline y el triaje local pasan a estado Degraded [50%]).
+- Tabla comparativa de valor agregado: Muestra qué aporta cada capa en granularidad, alcance lingüístico, tiempo de redacción (<1 min vs 30–60 min), priorización, dependencia de infraestructura, costo y confianza.
+
+================================================================================
+3. DETALLE TÉCNICO DE LOS MODELOS Y SERVICIOS
+================================================================================
+
+1. `models/risk_model.py` (Modelo ML Local + Explicabilidad por Oclusión)
+   - Genera un dataset sintético determinista (`seed=42`, `N=1500` filas) cruzando los 8 municipios (con variación aleatoria de ±10% en sus indicadores estáticos para generalizar) con escenarios aleatorios de huracán.
+   - Utiliza una función física plausible (`physical_risk_score`) que modela el decaimiento exponencial del viento, marea de tormenta y lluvia según la distancia en kilómetros a la polilínea de la trayectoria del huracán, combinada con la vulnerabilidad física y social (vulnerabilidad a inundación, elevación, porcentaje hablante de maya, brecha de albergues y densidad poblacional).
+   - Entrena un `RandomForestRegressor` de scikit-learn (250 árboles, `max_depth=14`, `min_samples_leaf=2`) logrando un R² ≈ 0.94 y MAE ≈ 3.7 puntos.
+   - Guarda el artefacto entrenado en `models/artifacts/risk_model.joblib` para carga instantánea.
+   - Explicabilidad local (`explain_local`): Para cada municipio en el escenario actual, reemplaza una por una cada una de las 10 variables por su media de entrenamiento y mide cuántos puntos cae el riesgo predicho. Los 3 factores con mayor caída se reportan como los "Top 3 risk drivers" de ese municipio.
+
+2. `services/alert_generator.py` (Generador Multilingüe + Fallback Resiliente)
+   - Soporta Google Gemini (`google-genai`) y OpenAI (`openai`) configurables mediante `.env`.
+   - Impone límite estricto de 160 caracteres para SMS Cell Broadcast (`enforce_sms_limit`).
+   - Garantiza cero caídas en presentaciones en vivo: cualquier excepción de red, falta de clave API, timeout o modo offline devuelve instantáneamente las plantillas rellenadas desde `data/fallback_alerts.json` e informa la razón exacta del fallback en la interfaz.
+
+3. `services/triage_engine.py` (Motor de Priorización y Auditoría HITL)
+   - Calcula `priority_score` (0–100) y clasifica en bandas operativas (`P1 – Immediate` >= 75, `P2 – Urgent` >= 55, `P3 – Priority` >= 35, `P4 – Routine` < 35).
+   - Ejecuta asignación voraz (`suggest_allocation`) respetando límites de unidades y matriz de reemplazos (`ALTERNATES`).
+   - Gestiona el estado de decisiones y bitácora de auditoría en `st.session_state`.
+
+================================================================================
+4. GUION SUGERIDO PARA LA PRESENTACIÓN / DEMO (5 MINUTOS)
+================================================================================
+1. Minuto 1 (Mapa de Riesgo): Iniciar con un huracán Categoría 4, 300 mm de lluvia, 3 m de marea de tormenta e impacto en "North Coast". Explicar los 4 KPIs y mostrar cómo Progreso y Hunucmá aparecen en riesgo Crítico/Alto.
+2. Minuto 2 (Sensibilidad Espacial y Explicabilidad): Cambiar la zona de impacto a "East Coast". Mostrar cómo el riesgo se desplaza inmediatamente hacia Río Lagartos y Tizimín (El Cuyo). Abrir la tabla de "Top 3 ML risk drivers" para mostrar por qué la IA asigna ese puntaje a cada municipio.
+3. Minuto 3 (Estudio de Alertas Multilingües): Ir a la pestaña 2, elegir Tizimín (El Cuyo) o Tekax (alta población maya) y pulsar "Generate Alert". Mostrar los mensajes en Español, Maya Yucateco e Inglés para SMS, WhatsApp y Radio, destacando el aviso de validación con INDEMAYA.
+4. Minuto 4 (Triaje Human-in-the-Loop): Ir a la pestaña 3. Mostrar cómo los casos de peligro de muerte (pacientes de diálisis en Celestún y familias en techos en Río Lagartos) encabezan la cola (P1). Aprobar una sugerencia de la IA, hacer "Override" en otra escribiendo una justificación local y abrir el registro de auditoría.
+5. Minuto 5 (Critical Check y Apagón): Activar el interruptor "Simulate Power & Telecom Outage" en la barra lateral. Ir a la pestaña 4 y demostrar el punto central de la presentación: cómo la capa de IA se degrada a modo local/plantillas mientras la radio comunitaria, los mapas impresos y el drenaje siguen sosteniendo la respuesta.
+
+================================================================================
+5. CÓDIGO FUENTE COMPLETO DE TODOS LOS ARCHIVOS DEL PROYECTO
+================================================================================
+
+--------------------------------------------------------------------------------
+ARCHIVO 1: app.py
+Rol: Interfaz principal en Streamlit (Barra lateral + 4 pestañas interactivas).
+--------------------------------------------------------------------------------
+```python
+"""Yucatán Hurricane Early Warning & Response System (Yucatán EWRS) – Streamlit MVP.
+
+Run with:  streamlit run app.py
+"""
+
+from __future__ import annotations
+
+import html
+import warnings
+from typing import Any
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
+from models.risk_model import (
+    LANDFALL_TRACKS,
+    RISK_COLORS,
+    Scenario,
+    load_model,
+    load_municipalities,
+    predict_municipality_risks,
+    scenario_to_dict,
+)
+from services.alert_generator import (
+    CHANNELS,
+    LANGUAGES,
+    MAYA_DISCLAIMER,
+    SMS_MAX_CHARS,
+    STATUS_LIVE,
+    AlertResult,
+    generate_alerts,
+    get_llm_config,
+    llm_available,
+)
+from services import triage_engine as triage
+
+st.set_page_config(
+    page_title="Yucatán EWRS",
+    page_icon="🌀",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+RISK_ORDER = ["Low", "Moderate", "High", "Critical"]
+STATUS_COLORS = {"Operational": "#2E9E6A", "Degraded": "#E3B23C", "Offline": "#C8423B"}
+BAND_COLORS = {
+    "P1 – Immediate": "#C8423B",
+    "P2 – Urgent": "#E07B39",
+    "P3 – Priority": "#E3B23C",
+    "P4 – Routine": "#2E9E6A",
+}
+
+# --------------------------------------------------------------------------- #
+# Styling (neutral; works in both light and dark Streamlit themes)
+# --------------------------------------------------------------------------- #
+st.markdown(
+    """
+<style>
+.block-container {padding-top: 1.6rem; padding-bottom: 2rem;}
+.ewrs-title {font-size: 1.65rem; font-weight: 700; margin-bottom: 0;}
+.ewrs-sub {opacity: .7; margin-top: .1rem; font-size: .95rem;}
+.kpi {border: 1px solid rgba(128,128,128,.25); border-radius: 10px; padding: .85rem 1rem;
+      background: rgba(128,128,128,.06); height: 100%;}
+.kpi .label {font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; opacity: .7;}
+.kpi .value {font-size: 1.7rem; font-weight: 700; line-height: 1.25;}
+.kpi .hint {font-size: .8rem; opacity: .75;}
+.badge {display: inline-block; padding: .18rem .6rem; border-radius: 999px; font-size: .78rem;
+        font-weight: 600; color: #fff; margin-right: .35rem; white-space: nowrap;}
+.chip {display: inline-block; padding: .15rem .55rem; border-radius: 6px; font-size: .8rem;
+       border: 1px solid rgba(128,128,128,.35); margin: 0 .3rem .3rem 0;}
+.msg {white-space: pre-wrap; font-size: .9rem; line-height: 1.45; border-radius: 8px;
+      padding: .75rem .85rem; background: rgba(128,128,128,.07); border: 1px solid rgba(128,128,128,.2);}
+.meta {font-size: .76rem; opacity: .7; margin-top: .3rem;}
+.comp {border-left: 5px solid; border-radius: 6px; padding: .55rem .8rem; margin-bottom: .5rem;
+       background: rgba(128,128,128,.06);}
+.comp .name {font-weight: 600;}
+.comp .note {font-size: .82rem; opacity: .8;}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+
+def badge(text: str, color: str) -> str:
+    """Return an HTML pill badge."""
+    return f'<span class="badge" style="background:{color}">{html.escape(text)}</span>'
+
+
+def kpi(col: Any, label: str, value: str, hint: str = "") -> None:
+    """Render a KPI card in a column."""
+    col.markdown(
+        f'<div class="kpi"><div class="label">{label}</div><div class="value">{value}</div>'
+        f'<div class="hint">{hint}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Cached resources
+# --------------------------------------------------------------------------- #
+@st.cache_resource(show_spinner="Loading risk model…")
+def get_model() -> dict[str, Any]:
+    """Load (or train on first run) the RandomForest artifact."""
+    return load_model()
+
+
+@st.cache_data(show_spinner=False)
+def get_predictions(category: int, rainfall: float, surge: float, zone: str) -> pd.DataFrame:
+    """Cached risk predictions for a scenario."""
+    return predict_municipality_risks(Scenario(category, rainfall, surge, zone), get_model())
+
+
+@st.cache_data(show_spinner=False)
+def get_metadata() -> dict[str, Any]:
+    """Municipality dataset metadata (sources, disclaimer)."""
+    return load_municipalities()[1]
+
+
+# --------------------------------------------------------------------------- #
+# Sidebar
+# --------------------------------------------------------------------------- #
+with st.sidebar:
+    st.markdown("### 🌀 Hurricane Scenario Simulator")
+    category = st.slider("Saffir-Simpson category", 1, 5, 4)
+    rainfall = st.slider("Rainfall (mm / 24 h)", 50, 500, 300, step=10)
+    surge = st.slider("Storm surge (m)", 0.0, 6.0, 3.0, step=0.1)
+    zone = st.selectbox("Landfall zone", list(LANDFALL_TRACKS.keys()), index=0)
+
+    st.divider()
+    st.markdown("### ⚙️ Operations")
+    has_key = llm_available()
+    offline_mode = st.toggle(
+        "Offline / Demo Mode",
+        value=not has_key,
+        help="Forces pre-approved alert templates. Guarantees the demo works without internet.",
+    )
+    outage = st.toggle(
+        "Simulate Power & Telecom Outage",
+        value=False,
+        help="Shows how each component degrades when power and commercial telecom fail.",
+    )
+    map_renderer = st.selectbox(
+        "Map renderer",
+        ["Auto", "Street map (needs internet)", "Offline vector map"],
+        help="Auto uses OpenStreetMap tiles when online and switches to an offline vector map otherwise.",
+    )
+
+    cfg = get_llm_config()
+    online = not offline_mode and not outage
+    if online and has_key:
+        st.caption(f"🟢 LLM: **{cfg['provider'].title()}** · `{cfg['model']}`")
+    elif not has_key:
+        st.caption("⚪ No API key in `.env` → offline templates")
+    else:
+        st.caption("⚪ LLM disabled → offline templates")
+
+    art = get_model()
+    with st.expander("Model card"):
+        st.markdown(
+            f"**RandomForestRegressor** · {art['metrics']['n_train']:,} train / "
+            f"{art['metrics']['n_test']:,} test synthetic rows  \n"
+            f"R² = **{art['metrics']['r2']:.2f}** · MAE = **{art['metrics']['mae']:.1f}** pts"
+        )
+        imp = pd.Series(art["feature_importances"]).sort_values()
+        st.bar_chart(imp, horizontal=True, height=260)
+
+scenario = Scenario(category, float(rainfall), float(surge), zone)
+scenario_dict = scenario_to_dict(scenario)
+preds = get_predictions(category, float(rainfall), float(surge), zone)
+metadata = get_metadata()
+
+# --------------------------------------------------------------------------- #
+# Header
+# --------------------------------------------------------------------------- #
+st.markdown('<div class="ewrs-title">Yucatán Hurricane Early Warning & Response System</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="ewrs-sub">AI-assisted hyperlocal risk, multilingual alerts and human-in-the-loop response · '
+    "Prototype for PROCIVY</div>",
+    unsafe_allow_html=True,
+)
+mode_badge = badge("Online", "#3B6EA8") if online else badge("Offline / Demo", "#6B7280")
+outage_badge = badge("Power & Telecom Outage", "#C8423B") if outage else ""
+st.markdown(
+    f'<div style="margin-top:.5rem">{mode_badge}{outage_badge}'
+    f'<span class="chip">Category {category}</span><span class="chip">{rainfall} mm/24h</span>'
+    f'<span class="chip">Surge {surge:.1f} m</span><span class="chip">Landfall: {zone}</span></div>',
+    unsafe_allow_html=True,
+)
+
+tab_map, tab_alerts, tab_triage, tab_check = st.tabs(
+    ["🗺️ Hyperlocal Risk Map", "📣 Multilingual Alert Studio", "🚑 Post-Impact Triage", "⚖️ Critical Check"]
+)
+
+
+# --------------------------------------------------------------------------- #
+# Map helpers
+# --------------------------------------------------------------------------- #
+def _hover(df: pd.DataFrame) -> pd.DataFrame:
+    """Add formatted hover columns."""
+    d = df.copy()
+    d["Exposed"] = d["exposed_population"].map("{:,}".format)
+    d["Population"] = d["population"].map("{:,}".format)
+    d["size"] = 8 + d["risk_score"] / 3.5
+    return d
+
+
+def street_map(df: pd.DataFrame, zone: str) -> go.Figure:
+    """OpenStreetMap tile map (scatter_mapbox, or scatter_map on Plotly >= 6)."""
+    d = _hover(df)
+    track = LANDFALL_TRACKS[zone]
+    common = dict(
+        lat="lat", lon="lon", color="risk_level", size="size", size_max=26,
+        color_discrete_map=RISK_COLORS, category_orders={"risk_level": RISK_ORDER},
+        hover_name="name", hover_data={"risk_score": True, "Exposed": True, "Population": True,
+                                       "size": False, "lat": False, "lon": False, "risk_level": False},
+        zoom=6.4, center={"lat": 20.95, "lon": -89.0}, height=520,
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        if hasattr(px, "scatter_mapbox"):
+            fig = px.scatter_mapbox(d, mapbox_style="open-street-map", **common)
+            fig.add_trace(go.Scattermapbox(lat=[p[0] for p in track], lon=[p[1] for p in track], mode="lines",
+                                           line=dict(width=3, color="#7C3AED"), name="Storm track"))
+        else:
+            fig = px.scatter_map(d, map_style="open-street-map", **common)
+            fig.add_trace(go.Scattermap(lat=[p[0] for p in track], lon=[p[1] for p in track], mode="lines",
+                                        line=dict(width=3, color="#7C3AED"), name="Storm track"))
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), legend=dict(title="Risk level", orientation="h", y=-0.02))
+    return fig
+
+
+def vector_map(df: pd.DataFrame, zone: str) -> go.Figure:
+    """Offline-safe scatter_geo map (no tile server required)."""
+    d = _hover(df)
+    track = LANDFALL_TRACKS[zone]
+    fig = px.scatter_geo(
+        d, lat="lat", lon="lon", color="risk_level", size="size", size_max=26,
+        color_discrete_map=RISK_COLORS, category_orders={"risk_level": RISK_ORDER},
+        hover_name="name", hover_data={"risk_score": True, "Exposed": True, "size": False,
+                                       "lat": False, "lon": False, "risk_level": False},
+        text="name", height=520,
+    )
+    fig.update_traces(textposition="top center", textfont=dict(size=11))
+    fig.add_trace(go.Scattergeo(lat=[p[0] for p in track], lon=[p[1] for p in track], mode="lines",
+                                line=dict(width=3, color="#7C3AED"), name="Storm track"))
+    fig.update_geos(
+        resolution=50, showland=True, landcolor="rgba(160,160,150,0.25)", showocean=True,
+        oceancolor="rgba(70,130,180,0.18)", showcoastlines=True, coastlinecolor="rgba(120,120,120,0.8)",
+        showcountries=True, countrycolor="rgba(120,120,120,0.5)", showsubunits=True,
+        subunitcolor="rgba(120,120,120,0.6)", lataxis_range=[19.4, 22.4], lonaxis_range=[-91.4, -86.6],
+        bgcolor="rgba(0,0,0,0)",
+    )
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor="rgba(0,0,0,0)",
+                      legend=dict(title="Risk level", orientation="h", y=-0.02))
+    return fig
+
+
+def render_map(df: pd.DataFrame, zone: str, renderer: str, offline: bool) -> None:
+    """Render the risk map; never crash – fall back to the vector map."""
+    use_street = renderer.startswith("Street") or (renderer == "Auto" and not offline)
+    if use_street:
+        try:
+            st.plotly_chart(street_map(df, zone), width="stretch", config={"displayModeBar": False})
+            st.caption("Basemap © OpenStreetMap contributors · switch to *Offline vector map* if tiles do not load.")
+            return
+        except Exception as exc:  # pragma: no cover - defensive
+            st.info(f"Street map unavailable ({type(exc).__name__}); showing offline vector map.")
+    st.plotly_chart(vector_map(df, zone), width="stretch", config={"displayModeBar": False})
+    st.caption("Offline vector map (no tile server required).")
+
+
+# --------------------------------------------------------------------------- #
+# Tab 1 – Hyperlocal Risk Map
+# --------------------------------------------------------------------------- #
+with tab_map:
+    high = preds[preds["risk_level"].isin(["High", "Critical"])]
+    n_crit = int((preds["risk_level"] == "Critical").sum())
+    exposed = int(preds["exposed_population"].sum())
+    demand = int(preds["shelter_demand"].sum())
+    capacity = int(preds["shelter_capacity"].sum())
+    util = demand / capacity if capacity else 0.0
+    over = preds[preds["shelter_demand"] > preds["shelter_capacity"]]["name"].tolist()
+    util_state = "Over capacity" if util > 1 else ("Strained" if util > 0.7 else "Within capacity")
+
+    c1, c2, c3, c4 = st.columns(4)
+    kpi(c1, "High / Critical municipalities", f"{len(high)} / {len(preds)}", f"{n_crit} critical")
+    kpi(c2, "Estimated exposed population", f"{exposed:,}", "Residents facing life-threatening hazards")
+    kpi(c3, "Shelter capacity status", f"{util:.0%}", f"{util_state} · {demand:,} / {capacity:,} beds"
+        + (f" · ⚠️ {', '.join(over)}" if over else ""))
+    top = preds.iloc[0]
+    kpi(c4, "Highest-risk municipality", html.escape(top["name"]),
+        f"Score {top['risk_score']:.0f}/100 · {top['risk_level']}")
+
+    st.write("")
+    left, right = st.columns([3, 2], gap="large")
+    with left:
+        render_map(preds, zone, map_renderer, offline=offline_mode or outage)
+    with right:
+        st.markdown("**Risk ranking**")
+        bar = px.bar(
+            preds.sort_values("risk_score"), x="risk_score", y="name", orientation="h", color="risk_level",
+            color_discrete_map=RISK_COLORS, category_orders={"risk_level": RISK_ORDER},
+            labels={"risk_score": "Risk score (0–100)", "name": ""}, height=470, range_x=[0, 100],
+        )
+        for x in (25, 50, 75):
+            bar.add_vline(x=x, line_dash="dot", line_color="rgba(128,128,128,.5)")
+        bar.update_layout(margin=dict(l=0, r=10, t=10, b=0), showlegend=False,
+                          paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(bar, width="stretch", config={"displayModeBar": False})
+
+    with st.expander("🔍 Top 3 ML risk drivers per municipality", expanded=False):
+        table = pd.DataFrame(
+            {
+                "Municipality": preds["name"],
+                "Risk score": preds["risk_score"],
+                "Level": preds["risk_level"],
+                "Distance to track (km)": preds["distance_to_track_km"].astype(int),
+                "Exposed pop.": preds["exposed_population"],
+                "Shelter demand / capacity": [
+                    f"{d:,} / {c:,}" for d, c in zip(preds["shelter_demand"], preds["shelter_capacity"])
+                ],
+                **{
+                    f"Driver {i + 1}": [
+                        f"{f[i]['label']}  (+{f[i]['contribution']:.1f})" if len(f) > i else "" for f in preds["top_factors"]
+                    ]
+                    for i in range(3)
+                },
+            }
+        )
+        st.dataframe(
+            table,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "Risk score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f"),
+                "Exposed pop.": st.column_config.NumberColumn(format="%d"),
+            },
+        )
+        st.caption(
+            "Drivers come from a local occlusion analysis: each feature is reset to its training average and the "
+            "drop in predicted risk (points, shown in brackets) measures its contribution."
+        )
+
+    st.caption(
+        f"ℹ️ **Data note:** {metadata.get('disclaimer', '')} Real-world sources: "
+        + "; ".join(metadata.get("reference_sources", []))
+        + ". Risk scores come from a model trained on synthetic, physically plausible scenarios."
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Tab 2 – Multilingual Alert Studio
+# --------------------------------------------------------------------------- #
+with tab_alerts:
+    left, right = st.columns([1, 3], gap="large")
+    with left:
+        names = preds["name"].tolist()
+        muni = st.selectbox("Municipality", names, index=0, help="Sorted by current risk score.")
+        profile = preds[preds["name"] == muni].iloc[0].to_dict()
+        st.markdown(
+            f"{badge(profile['risk_level'], RISK_COLORS[profile['risk_level']])}"
+            f"<b>{profile['risk_score']:.0f}</b>/100",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"- Exposed population: **{profile['exposed_population']:,}**\n"
+            f"- Maya-speaking: **{profile['maya_speaking_pct']:.0f}%**\n"
+            f"- Distance to track: **{profile['distance_to_track_km']:.0f} km**\n"
+            f"- Main driver: {profile['top_factors'][0]['label']}"
+        )
+        generate = st.button("📣 Generate Alert", type="primary", width="stretch")
+        if outage and not offline_mode:
+            st.caption("Telecom outage simulated → cloud LLM unreachable, offline templates will be used.")
+
+    request_key = (muni, category, rainfall, surge, zone, online)
+    if generate:
+        with st.spinner("Generating multilingual alerts…"):
+            st.session_state["alert_result"] = generate_alerts(profile, scenario_dict, online=online)
+            st.session_state["alert_key"] = request_key
+
+    with right:
+        result: AlertResult | None = st.session_state.get("alert_result")
+        if result is None:
+            st.info("Select a municipality and press **Generate Alert** to draft Cell Broadcast, WhatsApp and radio messages in Spanish, Yucatec Maya and English.")
+        else:
+            if st.session_state.get("alert_key") != request_key:
+                st.warning("Scenario or municipality changed since these alerts were generated – press **Generate Alert** to refresh.")
+            src_color = "#2E9E6A" if result.status == STATUS_LIVE else "#6B7280"
+            st.markdown(
+                f"{badge(result.status, src_color)}{badge(result.risk_level, RISK_COLORS[result.risk_level])}"
+                f"<b>{html.escape(result.municipality)}</b> · <span style='opacity:.7'>{html.escape(result.provider)}</span>",
+                unsafe_allow_html=True,
+            )
+            if result.reason:
+                st.caption(f"Fallback reason: {result.reason}")
+            for w in result.warnings:
+                st.caption(f"⚠️ {w}")
+
+            lang_tabs = st.tabs([f"{name}" for name in LANGUAGES.values()])
+            for lang_tab, lang in zip(lang_tabs, LANGUAGES):
+                with lang_tab:
+                    cols = st.columns([1, 1.25, 1.25], gap="medium")
+                    for col, (ch, ch_name) in zip(cols, CHANNELS.items()):
+                        text = result.alerts[lang][ch]
+                        if ch == "sms":
+                            meta = f"{len(text)}/{SMS_MAX_CHARS} characters"
+                        elif ch == "radio":
+                            words = len(text.split())
+                            meta = f"{words} words · ≈{words / 2.5:.0f} s read aloud"
+                        else:
+                            meta = f"{len(text.split())} words"
+                        col.markdown(f"**{ch_name}**")
+                        col.markdown(f'<div class="msg">{html.escape(text)}</div><div class="meta">{meta}</div>',
+                                     unsafe_allow_html=True)
+                    if lang == "yua":
+                        st.warning(f"⚠️ {MAYA_DISCLAIMER}")
+
+    st.caption(f"⚠️ {MAYA_DISCLAIMER}")
+
+
+# --------------------------------------------------------------------------- #
+# Tab 3 – Post-Impact Triage (Human-in-the-Loop)
+# --------------------------------------------------------------------------- #
+with tab_triage:
+    incidents, brigades = triage.load_incident_data()
+    area_risk = dict(zip(preds["name"], preds["risk_score"]))
+    queue = triage.suggest_allocation(triage.score_incidents(incidents, area_risk), brigades)
+    triage.init_decisions(queue["id"].tolist(), st.session_state)
+    decisions = st.session_state["triage_decisions"]
+    options = triage.brigade_options(brigades)
+
+    statuses = [decisions[i]["status"] for i in queue["id"]]
+    c1, c2, c3, c4, c5 = st.columns(5)
+    kpi(c1, "Open incidents", str(len(queue)))
+    kpi(c2, "P1 – Immediate", str(int((queue["priority_band"] == "P1 – Immediate").sum())))
+    kpi(c3, "Pending review", str(statuses.count(triage.STATUS_PENDING)))
+    kpi(c4, "Approved", str(statuses.count(triage.STATUS_APPROVED)))
+    kpi(c5, "Overridden", str(statuses.count(triage.STATUS_OVERRIDDEN)))
+    st.write("")
+
+    if outage:
+        st.warning("📡 Outage mode: digital incident intake (apps, WhatsApp, telemetry) is down. New reports arrive via "
+                   "VHF/HF radio and satellite phones and are typed in by operators – the queue may be incomplete.")
+
+    a1, a2, _ = st.columns([1.3, 1, 3])
+
+    def _approve_all() -> None:
+        for row in queue.itertuples():
+            if st.session_state["triage_decisions"][row.id]["status"] == triage.STATUS_PENDING:
+                triage.record_decision(st.session_state, row.id, triage.STATUS_APPROVED, row.ai_suggestion, "Bulk approval")
+
+    a1.button("✅ Approve all pending", on_click=_approve_all, width="stretch")
+    a2.button("↺ Reset decisions", on_click=triage.reset_decisions, args=(st.session_state,), width="stretch")
+    st.caption("AI suggests a brigade per incident (highest priority first, limited units). The PROCIVY operator "
+               "approves or overrides every dispatch – no unit moves without human sign-off.")
+
+    for row in queue.itertuples():
+        dec = decisions[row.id]
+        status_color = {"Approved": "#2E9E6A", "Overridden": "#3B6EA8"}.get(dec["status"], "#6B7280")
+        with st.container(border=True):
+            h1, h2 = st.columns([3, 2], gap="large")
+            with h1:
+                st.markdown(
+                    f"{badge(row.priority_band, BAND_COLORS[row.priority_band])}"
+                    f"<b>{row.priority_score:.0f}</b>/100 &nbsp;·&nbsp; <code>{row.id}</code> &nbsp;·&nbsp; "
+                    f"{html.escape(row.municipality)} &nbsp;·&nbsp; <span style='opacity:.7'>{row.reported_at} · {html.escape(row.source)}</span>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(f"**{row.title}**  \n{row.description}")
+                st.caption(
+                    f"Severity {row.severity}/5 · Vulnerable people {row.vulnerable_people:,} of {row.people_affected:,} · "
+                    f"Infrastructure criticality {row.infrastructure_criticality}/5 · Access: {row.access.replace('_', ' ')}"
+                )
+            with h2:
+                st.markdown(f"🤖 **AI suggestion:** {row.ai_suggestion}")
+                st.caption(row.ai_rationale)
+                st.markdown(
+                    f"{badge(dec['status'], status_color)}"
+                    + (f"→ <b>{html.escape(dec['assigned'])}</b> <span style='opacity:.6'>({dec['time']})</span>"
+                       if dec["assigned"] else ""),
+                    unsafe_allow_html=True,
+                )
+                b1, b2 = st.columns([1, 2])
+                b1.button(
+                    "Approve", key=f"approve_{row.id}", type="primary", width="stretch",
+                    disabled=dec["status"] != triage.STATUS_PENDING,
+                    on_click=triage.record_decision,
+                    args=(st.session_state, row.id, triage.STATUS_APPROVED, row.ai_suggestion, "AI suggestion accepted"),
+                )
+                with b2.popover("Override", width="stretch"):
+                    default_idx = options.index(row.ai_suggestion) if row.ai_suggestion in options else 0
+                    choice = st.selectbox("Assign instead", options, index=default_idx, key=f"ov_sel_{row.id}")
+                    note = st.text_input("Reason (audit log)", key=f"ov_note_{row.id}",
+                                         placeholder="e.g. local knowledge: road via Kinchil is open")
+                    st.button(
+                        "Confirm override", key=f"ov_btn_{row.id}",
+                        on_click=triage.record_decision,
+                        args=(st.session_state, row.id, triage.STATUS_OVERRIDDEN, choice, note or "Operator override"),
+                    )
+
+    with st.expander("📝 Dispatch audit log", expanded=False):
+        audit = st.session_state.get("triage_audit", [])
+        if audit:
+            st.dataframe(pd.DataFrame(audit), hide_index=True, width="stretch")
+        else:
+            st.caption("No decisions recorded yet.")
+        st.caption("Brigade roster: " + " · ".join(f"{b['type']} ×{b['units']}" for b in brigades))
+
+
+# --------------------------------------------------------------------------- #
+# Tab 4 – Critical Check (Baseline vs. AI)
+# --------------------------------------------------------------------------- #
+BASELINE_COMPONENTS: list[dict[str, str]] = [
+    {"name": "Cell Broadcast (CBS) alerts", "normal": "Operational", "outage": "Degraded",
+     "note": "No app or data plan needed; works while towers run on backup batteries (≈4–8 h)."},
+    {"name": "Community radio (AM/FM, generator-backed)", "normal": "Operational", "outage": "Operational",
+     "note": "Battery radios reach households in Spanish and Maya; stations run on generators."},
+    {"name": "Static GIS & printed evacuation maps", "normal": "Operational", "outage": "Operational",
+     "note": "Pre-printed risk atlas and routes posted at shelters and municipal halls."},
+    {"name": "Drainage & pozos de absorción maintenance", "normal": "Operational", "outage": "Operational",
+     "note": "Pre-season physical work – no runtime dependency on power or networks."},
+    {"name": "Sirens, perifoneo & VHF/HF radio", "normal": "Operational", "outage": "Operational",
+     "note": "Loudspeaker vehicles, brigades and radio nets independent of commercial telecom."},
+]
+AI_COMPONENTS: list[dict[str, str]] = [
+    {"name": "Hyperlocal ML risk model", "normal": "Operational", "outage": "Degraded",
+     "note": "Runs locally on a laptop, but live CONAGUA/SMN feeds stop → last known scenario only."},
+    {"name": "LLM multilingual alert drafting", "normal": "Operational", "outage": "Degraded",
+     "note": "Cloud API unreachable → automatic switch to pre-approved offline templates."},
+    {"name": "WhatsApp community distribution", "normal": "Operational", "outage": "Offline",
+     "note": "Requires mobile data / internet – unavailable until telecom is restored."},
+    {"name": "Interactive street-map dashboard", "normal": "Operational", "outage": "Degraded",
+     "note": "Map tiles unavailable → offline vector map; needs a powered device."},
+    {"name": "Real-time digital incident intake", "normal": "Operational", "outage": "Offline",
+     "note": "Apps, social media and IoT telemetry go dark; reports only by radio / satellite phone."},
+    {"name": "AI triage & brigade suggestions", "normal": "Operational", "outage": "Degraded",
+     "note": "Still computes locally but on delayed, incomplete data – human operator decides."},
+]
+STATUS_VALUE = {"Operational": 100, "Degraded": 50, "Offline": 0}
+
+with tab_check:
+    condition = "outage" if outage else "normal"
+    if outage:
+        st.error("⚡ **Power & telecom outage simulated.** Highlighted below: which AI components degrade and which "
+                 "low-tech protocols keep working.")
+    else:
+        st.success("All systems nominal. Toggle **Simulate Power & Telecom Outage** in the sidebar to stress-test the architecture.")
+
+    def render_components(title: str, comps: list[dict[str, str]]) -> None:
+        st.markdown(f"#### {title}")
+        for c in comps:
+            status = c[condition]
+            color = STATUS_COLORS[status]
+            changed = outage and status != c["normal"]
+            weight = "border-width:0 0 0 5px;" + ("box-shadow:0 0 0 2px " + color + "55;" if changed else "")
+            st.markdown(
+                f'<div class="comp" style="border-color:{color};{weight}">'
+                f'<span class="name">{html.escape(c["name"])}</span> {badge(status, color)}'
+                f'<div class="note">{html.escape(c["note"])}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    col_b, col_ai = st.columns(2, gap="large")
+    with col_b:
+        render_components("🛡️ Baseline – simple, non-AI protocols", BASELINE_COMPONENTS)
+    with col_ai:
+        render_components("🤖 AI augmentation layer", AI_COMPONENTS)
+
+    def capability(comps: list[dict[str, str]], cond: str) -> float:
+        return sum(STATUS_VALUE[c[cond]] for c in comps) / len(comps)
+
+    cap = pd.DataFrame(
+        [
+            {"Layer": layer, "Condition": cond_label, "Capability retained (%)": capability(comps, cond)}
+            for layer, comps in (("Baseline protocols", BASELINE_COMPONENTS), ("AI layer", AI_COMPONENTS))
+            for cond, cond_label in (("normal", "Normal operations"), ("outage", "Power & telecom outage"))
+        ]
+    )
+    g1, g2 = st.columns([2, 3], gap="large")
+    with g1:
+        fig = px.bar(
+            cap, x="Layer", y="Capability retained (%)", color="Condition", barmode="group",
+            color_discrete_map={"Normal operations": "#3B6EA8", "Power & telecom outage": "#C8423B"},
+            range_y=[0, 105], height=340, text_auto=".0f",
+        )
+        fig.update_layout(margin=dict(l=0, r=0, t=10, b=0), legend=dict(orientation="h", y=-0.2, title=""),
+                          paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis_title="")
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+        st.caption("Operational = 100 · Degraded = 50 · Offline = 0 (average across components).")
+    with g2:
+        st.markdown("#### What each layer adds")
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    ("Warning granularity", "State/regional bulletins", "Municipality-level risk scores & drivers"),
+                    ("Language reach", "Mostly Spanish", "Spanish + Yucatec Maya + English drafts in seconds"),
+                    ("Message drafting time", "Manual, 30–60 min", "< 1 min (human approval still required)"),
+                    ("Response prioritisation", "Ad-hoc, phone-based", "Scored queue + suggested brigades (HITL)"),
+                    ("Infrastructure dependence", "Very low", "High – power, data, cloud APIs"),
+                    ("Cost & maintenance", "Low, well understood", "Higher – data pipelines, model upkeep"),
+                    ("Trust & explainability", "Familiar to communities", "Needs transparency, validation, training"),
+                ],
+                columns=["Criterion", "Baseline", "AI layer"],
+            ),
+            hide_index=True,
+            width="stretch",
+        )
+
+    st.info(
+        "**Design principle:** AI is an *augmentation layer*, not a replacement. Simple protocols – Cell Broadcast, "
+        "community radio, printed maps and drainage maintenance – remain the backbone; the AI layer degrades "
+        "gracefully to pre-approved templates and human decision-making when power and telecom fail."
+    )
+```
+
+--------------------------------------------------------------------------------
+ARCHIVO 2: models/risk_model.py
+Rol: Modelo ML local (RandomForestRegressor), generación de datos sintéticos
+     físicamente plausibles, cálculo de distancia a la trayectoria del huracán,
+     estimación de población expuesta y explicabilidad local por oclusión.
+--------------------------------------------------------------------------------
+```python
+"""Hyperlocal hurricane risk model for the Yucatán EWRS prototype.
+
+The module builds a deterministic, physically plausible synthetic training set
+(municipality static features x hurricane scenario inputs), trains a
+``RandomForestRegressor`` that predicts a 0–100 risk score, persists it with
+``joblib`` and exposes :func:`predict_municipality_risks` for the dashboard.
+
+Per-municipality explanations are computed with a local occlusion analysis:
+each feature is replaced by its training-set mean and the resulting drop in the
+predicted score is reported as that feature's contribution.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass, asdict
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA_PATH = ROOT / "data" / "municipalities.json"
+ARTIFACT_DIR = ROOT / "models" / "artifacts"
+ARTIFACT_PATH = ARTIFACT_DIR / "risk_model.joblib"
+
+MODEL_VERSION = "1.0.0"
+RANDOM_SEED = 42
+N_SAMPLES = 1500
+
+FEATURES: list[str] = [
+    "category",
+    "rainfall_mm_24h",
+    "storm_surge_m",
+    "distance_to_track_km",
+    "coastal",
+    "flood_vulnerability",
+    "elevation_m",
+    "maya_speaking_pct",
+    "shelter_ratio",
+    "log_population",
+]
+
+FEATURE_LABELS: dict[str, str] = {
+    "category": "Hurricane intensity",
+    "rainfall_mm_24h": "Extreme rainfall",
+    "storm_surge_m": "Storm surge",
+    "distance_to_track_km": "Proximity to storm track",
+    "coastal": "Coastal exposure",
+    "flood_vulnerability": "Flood vulnerability",
+    "elevation_m": "Low elevation",
+    "maya_speaking_pct": "Language barrier (Maya-speaking pop.)",
+    "shelter_ratio": "Limited shelter capacity",
+    "log_population": "Population density",
+}
+
+RISK_LEVELS: list[tuple[float, str]] = [
+    (25.0, "Low"),
+    (50.0, "Moderate"),
+    (75.0, "High"),
+    (math.inf, "Critical"),
+]
+
+RISK_COLORS: dict[str, str] = {
+    "Low": "#2E9E6A",
+    "Moderate": "#E3B23C",
+    "High": "#E07B39",
+    "Critical": "#C8423B",
+}
+
+# Simplified storm tracks (lat, lon) for each landfall zone. The track passes
+# through the landfall point; distance to the polyline drives hazard decay.
+LANDFALL_TRACKS: dict[str, list[tuple[float, float]]] = {
+    "North Coast": [(22.60, -88.40), (21.32, -89.25), (20.30, -90.00)],
+    "West Coast": [(21.40, -91.60), (20.86, -90.42), (20.20, -89.60)],
+    "East Coast": [(21.90, -86.40), (21.48, -87.62), (20.80, -88.70)],
+    "Inland": [(19.70, -87.20), (20.45, -88.60), (20.95, -90.20)],
+}
+
+# Share of the exposed population expected to seek a public shelter.
+SHELTER_SEEKING_RATE = 0.25
+
+
+@dataclass(frozen=True)
+class Scenario:
+    """Hurricane scenario inputs selected in the sidebar simulator."""
+
+    category: int
+    rainfall_mm_24h: float
+    storm_surge_m: float
+    landfall_zone: str
+
+
+# --------------------------------------------------------------------------- #
+# Data helpers
+# --------------------------------------------------------------------------- #
+def load_municipalities(path: Path = DATA_PATH) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Load municipality baseline indicators and metadata.
+
+    Returns:
+        A DataFrame with one row per municipality and the metadata dictionary.
+    """
+    with open(path, encoding="utf-8") as fh:
+        payload = json.load(fh)
+    return pd.DataFrame(payload["municipalities"]), payload.get("metadata", {})
+
+
+def _to_km(lat: float, lon: float, ref_lat: float) -> tuple[float, float]:
+    """Project lat/lon to a local equirectangular plane in kilometres."""
+    return lon * 111.32 * math.cos(math.radians(ref_lat)), lat * 110.57
+
+
+def distance_to_track_km(lat: float, lon: float, landfall_zone: str) -> float:
+    """Minimum distance (km) from a point to the storm-track polyline."""
+    track = LANDFALL_TRACKS[landfall_zone]
+    px, py = _to_km(lat, lon, lat)
+    best = math.inf
+    for (lat1, lon1), (lat2, lon2) in zip(track[:-1], track[1:]):
+        ax, ay = _to_km(lat1, lon1, lat)
+        bx, by = _to_km(lat2, lon2, lat)
+        dx, dy = bx - ax, by - ay
+        seg_len2 = dx * dx + dy * dy
+        t = 0.0 if seg_len2 == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / seg_len2))
+        cx, cy = ax + t * dx, ay + t * dy
+        best = min(best, math.hypot(px - cx, py - cy))
+    return best
+
+
+def risk_level(score: float) -> str:
+    """Map a 0–100 risk score to a categorical risk level."""
+    for threshold, label in RISK_LEVELS:
+        if score < threshold:
+            return label
+    return "Critical"
+
+
+# --------------------------------------------------------------------------- #
+# Synthetic ground truth
+# --------------------------------------------------------------------------- #
+def physical_risk_score(df: pd.DataFrame) -> np.ndarray:
+    """Physically plausible 'ground-truth' risk formula used to label data.
+
+    Combines wind, storm-surge and rainfall hazards (each decaying with
+    distance to the track) with social and physical vulnerability.
+    """
+    cat = df["category"].to_numpy(float)
+    rain = df["rainfall_mm_24h"].to_numpy(float)
+    surge = df["storm_surge_m"].to_numpy(float)
+    dist = df["distance_to_track_km"].to_numpy(float)
+    coastal = df["coastal"].to_numpy(float)
+    flood = df["flood_vulnerability"].to_numpy(float)
+    elev = df["elevation_m"].to_numpy(float)
+    maya = df["maya_speaking_pct"].to_numpy(float) / 100.0
+    shelter = df["shelter_ratio"].to_numpy(float)
+    logpop = df["log_population"].to_numpy(float)
+
+    wind = (cat / 5.0) ** 1.6 * np.exp(-dist / 110.0)
+    elev_factor = np.clip(1.0 - elev / 10.0, 0.0, 1.0)
+    surge_h = coastal * np.clip(surge / 6.0, 0.0, 1.0) * np.exp(-dist / 70.0) * (0.3 + 0.7 * elev_factor)
+    rain_h = np.clip(rain / 500.0, 0.0, 1.0) * (0.4 + 0.6 * flood) * np.exp(-dist / 260.0)
+
+    hazard = np.clip(0.40 * wind + 0.35 * surge_h + 0.35 * rain_h, 0.0, 1.0)
+    shelter_gap = np.clip(1.0 - shelter / 0.20, 0.0, 1.0)
+    pop_density = np.clip((logpop - 8.0) / 6.0, 0.0, 1.0)
+    vulnerability = 0.45 * flood + 0.20 * maya + 0.20 * shelter_gap + 0.15 * pop_density
+
+    return np.clip(100.0 * hazard * (0.75 + 0.9 * vulnerability) * 1.25, 0.0, 100.0)
+
+
+def generate_synthetic_dataset(n_samples: int = N_SAMPLES, seed: int = RANDOM_SEED) -> pd.DataFrame:
+    """Create a deterministic synthetic training dataset.
+
+    Each row samples one of the 8 municipalities (with ±10% jitter on static
+    indicators so the model generalises) and a random hurricane scenario.
+    """
+    rng = np.random.default_rng(seed)
+    munis, _ = load_municipalities()
+    idx = rng.integers(0, len(munis), n_samples)
+    base = munis.iloc[idx].reset_index(drop=True)
+
+    def jitter(values: pd.Series, scale: float = 0.10) -> np.ndarray:
+        return values.to_numpy(float) * rng.uniform(1 - scale, 1 + scale, n_samples)
+
+    population = jitter(base["population"])
+    df = pd.DataFrame(
+        {
+            "category": rng.integers(1, 6, n_samples),
+            "rainfall_mm_24h": rng.uniform(40, 500, n_samples).round(0),
+            "storm_surge_m": rng.uniform(0.0, 6.0, n_samples).round(2),
+            "distance_to_track_km": np.clip(rng.gamma(2.0, 60.0, n_samples), 0, 350).round(1),
+            "coastal": base["coastal"].astype(int).to_numpy(),
+            "flood_vulnerability": np.clip(jitter(base["flood_vulnerability"]), 0, 1),
+            "elevation_m": np.clip(jitter(base["elevation_m"], 0.25), 0.5, None),
+            "maya_speaking_pct": np.clip(jitter(base["maya_speaking_pct"]), 0, 100),
+            "shelter_ratio": jitter(base["shelter_capacity"]) / population,
+            "log_population": np.log(population),
+        }
+    )
+    noise = rng.normal(0.0, 2.5, n_samples)
+    df["risk_score"] = np.clip(physical_risk_score(df) + noise, 0.0, 100.0)
+    return df
+
+
+# --------------------------------------------------------------------------- #
+# Training / persistence
+# --------------------------------------------------------------------------- #
+def train_model(save: bool = True) -> dict[str, Any]:
+    """Train the RandomForest risk model and optionally persist it.
+
+    Returns:
+        Artifact dictionary with the model, feature list, baseline means,
+        evaluation metrics and global feature importances.
+    """
+    df = generate_synthetic_dataset()
+    X, y = df[FEATURES], df["risk_score"]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
+
+    model = RandomForestRegressor(
+        n_estimators=250, max_depth=14, min_samples_leaf=2, random_state=RANDOM_SEED, n_jobs=-1
+    )
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+
+    artifact: dict[str, Any] = {
+        "version": MODEL_VERSION,
+        "model": model,
+        "features": FEATURES,
+        "feature_means": X_train.mean().to_dict(),
+        "metrics": {
+            "r2": float(r2_score(y_test, preds)),
+            "mae": float(mean_absolute_error(y_test, preds)),
+            "n_train": int(len(X_train)),
+            "n_test": int(len(X_test)),
+        },
+        "feature_importances": dict(zip(FEATURES, model.feature_importances_.round(4).tolist())),
+    }
+    if save:
+        ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+        joblib.dump(artifact, ARTIFACT_PATH)
+    return artifact
+
+
+def load_model(retrain_if_missing: bool = True) -> dict[str, Any]:
+    """Load the persisted artifact, retraining if it is missing or stale."""
+    if ARTIFACT_PATH.exists():
+        try:
+            artifact = joblib.load(ARTIFACT_PATH)
+            if artifact.get("version") == MODEL_VERSION and artifact.get("features") == FEATURES:
+                return artifact
+        except Exception:  # corrupted or incompatible pickle -> retrain
+            pass
+    if not retrain_if_missing:
+        raise FileNotFoundError(f"No valid model artifact at {ARTIFACT_PATH}")
+    return train_model(save=True)
+
+
+# --------------------------------------------------------------------------- #
+# Inference
+# --------------------------------------------------------------------------- #
+def build_feature_frame(scenario: Scenario, munis: pd.DataFrame) -> pd.DataFrame:
+    """Combine a scenario with municipality indicators into model features."""
+    return pd.DataFrame(
+        {
+            "category": scenario.category,
+            "rainfall_mm_24h": scenario.rainfall_mm_24h,
+            "storm_surge_m": scenario.storm_surge_m,
+            "distance_to_track_km": [
+                distance_to_track_km(r.lat, r.lon, scenario.landfall_zone) for r in munis.itertuples()
+            ],
+            "coastal": munis["coastal"].astype(int),
+            "flood_vulnerability": munis["flood_vulnerability"],
+            "elevation_m": munis["elevation_m"],
+            "maya_speaking_pct": munis["maya_speaking_pct"],
+            "shelter_ratio": munis["shelter_capacity"] / munis["population"],
+            "log_population": np.log(munis["population"]),
+        }
+    )[FEATURES]
+
+
+def _describe_factor(feature: str, row: pd.Series) -> str:
+    """Human-readable label for a contributing factor with its value."""
+    value = row[feature]
+    detail = {
+        "category": f"Category {int(value)}",
+        "rainfall_mm_24h": f"{value:.0f} mm/24h",
+        "storm_surge_m": f"{value:.1f} m surge",
+        "distance_to_track_km": f"{value:.0f} km from track",
+        "coastal": "coastline",
+        "flood_vulnerability": f"index {value:.2f}",
+        "elevation_m": f"{value:.0f} m a.s.l.",
+        "maya_speaking_pct": f"{value:.0f}% Maya-speaking",
+        "shelter_ratio": f"{value * 100:.0f} beds / 100 residents",
+        "log_population": f"{math.exp(value):,.0f} residents",
+    }[feature]
+    return f"{FEATURE_LABELS[feature]} ({detail})"
+
+
+def explain_local(artifact: dict[str, Any], X: pd.DataFrame, top_k: int = 3) -> list[list[dict[str, Any]]]:
+    """Occlusion-based local explanation of each prediction.
+
+    For each feature, replace it with its training mean and record how much the
+    prediction falls. Returns the ``top_k`` positive drivers per row.
+    """
+    model = artifact["model"]
+    base_pred = model.predict(X)
+    contributions = np.zeros((len(X), len(FEATURES)))
+    for j, feat in enumerate(FEATURES):
+        X_ref = X.copy()
+        X_ref[feat] = artifact["feature_means"][feat]
+        contributions[:, j] = base_pred - model.predict(X_ref)
+
+    explanations: list[list[dict[str, Any]]] = []
+    for i in range(len(X)):
+        order = np.argsort(-contributions[i])[:top_k]
+        explanations.append(
+            [
+                {
+                    "feature": FEATURES[j],
+                    "label": _describe_factor(FEATURES[j], X.iloc[i]),
+                    "contribution": round(float(contributions[i, j]), 1),
+                }
+                for j in order
+            ]
+        )
+    return explanations
+
+
+def estimate_exposed_population(population: float, score: float, coastal: bool) -> int:
+    """Estimate residents directly exposed to life-threatening hazards."""
+    fraction = (score / 100.0) ** 2 * (0.85 if coastal else 0.30)
+    return int(round(population * fraction, -1))
+
+
+def predict_municipality_risks(scenario: Scenario | dict[str, Any], artifact: dict[str, Any] | None = None) -> pd.DataFrame:
+    """Predict hyperlocal risk for every municipality under a scenario.
+
+    Args:
+        scenario: A :class:`Scenario` or dict with ``category``,
+            ``rainfall_mm_24h``, ``storm_surge_m`` and ``landfall_zone``.
+        artifact: Optional pre-loaded model artifact.
+
+    Returns:
+        DataFrame with municipality info plus ``risk_score``, ``risk_level``,
+        ``distance_to_track_km``, ``exposed_population``, ``shelter_demand``,
+        ``top_factors`` (list of dicts) and ``top_factors_text``.
+    """
+    if isinstance(scenario, dict):
+        scenario = Scenario(**scenario)
+    artifact = artifact or load_model()
+    munis, _ = load_municipalities()
+    X = build_feature_frame(scenario, munis)
+
+    scores = np.clip(artifact["model"].predict(X), 0, 100).round(1)
+    explanations = explain_local(artifact, X)
+
+    out = munis.copy()
+    out["distance_to_track_km"] = X["distance_to_track_km"].round(0).to_numpy()
+    out["risk_score"] = scores
+    out["risk_level"] = [risk_level(s) for s in scores]
+    out["exposed_population"] = [
+        estimate_exposed_population(p, s, c) for p, s, c in zip(out["population"], scores, out["coastal"])
+    ]
+    out["shelter_demand"] = (out["exposed_population"] * SHELTER_SEEKING_RATE).round().astype(int)
+    out["top_factors"] = explanations
+    out["top_factors_text"] = [" · ".join(f["label"] for f in exp) for exp in explanations]
+    return out.sort_values("risk_score", ascending=False).reset_index(drop=True)
+
+
+def scenario_to_dict(scenario: Scenario) -> dict[str, Any]:
+    """Serialise a scenario (handy for caching keys and prompts)."""
+    return asdict(scenario)
+
+
+if __name__ == "__main__":
+    art = train_model(save=True)
+    print(f"Model saved to {ARTIFACT_PATH}")
+    print("Metrics:", art["metrics"])
+    demo = predict_municipality_risks(Scenario(4, 300, 3.5, "North Coast"), art)
+    print(demo[["name", "risk_score", "risk_level", "exposed_population", "top_factors_text"]].to_string())
+```
+
+--------------------------------------------------------------------------------
+ARCHIVO 3: services/alert_generator.py
+Rol: Generador de alertas trilingües (Español, Maya Yucateco, Inglés) para
+     3 canales (SMS <=160 chars, WhatsApp, Guion de Radio de 30 s) con soporte
+     para Google Gemini / OpenAI y fallback automático a plantillas offline.
+--------------------------------------------------------------------------------
+```python
+"""Multilingual emergency alert generation (Spanish, Yucatec Maya, English).
+
+Alerts are produced for three channels — Cell Broadcast SMS (<=160 chars),
+WhatsApp community message and a 30-second community radio script.
+
+Generation strategy:
+    1. If Online Mode is active and an API key is configured, call the
+       configured LLM provider (Google Gemini or OpenAI).
+    2. Otherwise — or if the call fails, times out or returns malformed
+       output — fill the pre-approved templates in ``data/fallback_alerts.json``.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
+FALLBACK_PATH = ROOT / "data" / "fallback_alerts.json"
+load_dotenv(ROOT / ".env")
+
+LANGUAGES: dict[str, str] = {"es": "Spanish", "yua": "Yucatec Maya", "en": "English"}
+CHANNELS: dict[str, str] = {
+    "sms": "Cell Broadcast SMS",
+    "whatsapp": "WhatsApp Community Message",
+    "radio": "30-sec Community Radio Script",
+}
+SMS_MAX_CHARS = 160
+HOTLINE = "911"
+LLM_TIMEOUT_S = 20
+
+STATUS_LIVE = "Live LLM"
+STATUS_FALLBACK = "Offline Fallback"
+
+MAYA_DISCLAIMER = (
+    "Yucatec Maya outputs are machine-assisted drafts. They must be validated by native speakers "
+    "and INDEMAYA (Instituto para el Desarrollo de la Cultura Maya del Estado de Yucatán) before any "
+    "real-world deployment."
+)
+
+
+@dataclass
+class AlertResult:
+    """Generated alert bundle and its provenance."""
+
+    municipality: str
+    risk_level: str
+    alerts: dict[str, dict[str, str]]  # {lang: {channel: text}}
+    status: str  # STATUS_LIVE or STATUS_FALLBACK
+    provider: str
+    reason: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- #
+# Configuration helpers
+# --------------------------------------------------------------------------- #
+def get_llm_config() -> dict[str, str | None]:
+    """Read LLM provider settings from the environment / ``.env``."""
+    provider = (os.getenv("LLM_PROVIDER") or "gemini").strip().lower()
+    if provider == "openai":
+        key, model = os.getenv("OPENAI_API_KEY"), os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+    else:
+        provider = "gemini"
+        key, model = os.getenv("GEMINI_API_KEY"), os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+    return {"provider": provider, "api_key": (key or "").strip() or None, "model": model}
+
+
+def llm_available() -> bool:
+    """True when an API key for the configured provider is present."""
+    return get_llm_config()["api_key"] is not None
+
+
+def load_fallback_library(path: Path = FALLBACK_PATH) -> dict[str, Any]:
+    """Load the offline template library."""
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+# --------------------------------------------------------------------------- #
+# Formatting helpers
+# --------------------------------------------------------------------------- #
+def _short_factor(profile: dict[str, Any]) -> str:
+    """Main risk driver label without the parenthesised value."""
+    factors = profile.get("top_factors") or []
+    if not factors:
+        return "hurricane hazard"
+    return re.sub(r"\s*\(.*\)$", "", factors[0]["label"])
+
+
+def enforce_sms_limit(text: str, limit: int = SMS_MAX_CHARS) -> str:
+    """Collapse whitespace and trim an SMS to ``limit`` characters."""
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip(" ,.;:") + "…"
+
+
+def _template_values(profile: dict[str, Any], scenario: dict[str, Any], lang: str, labels: dict[str, Any]) -> dict[str, str]:
+    """Placeholder values for template injection in a given language."""
+    level = profile["risk_level"]
+    return {
+        "municipality": profile["name"],
+        "locality": profile.get("locality", profile["name"]),
+        "category": str(scenario["category"]),
+        "risk_level": labels.get(lang, {}).get(level, level.upper()),
+        "risk_score": f"{profile['risk_score']:.0f}",
+        "rainfall": f"{scenario['rainfall_mm_24h']:.0f}",
+        "surge": f"{scenario['storm_surge_m']:.1f}",
+        "exposed": f"{profile.get('exposed_population', 0):,}",
+        "top_factor": _short_factor(profile),
+        "hotline": HOTLINE,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Offline fallback
+# --------------------------------------------------------------------------- #
+def generate_fallback_alerts(profile: dict[str, Any], scenario: dict[str, Any], reason: str = "Offline / Demo Mode") -> AlertResult:
+    """Fill pre-approved templates with municipality / risk values."""
+    library = load_fallback_library()
+    level = profile["risk_level"]
+    templates = library["templates"].get(level) or library["templates"]["High"]
+    labels = library.get("risk_labels", {})
+
+    alerts: dict[str, dict[str, str]] = {}
+    for lang in LANGUAGES:
+        values = _template_values(profile, scenario, lang, labels)
+        alerts[lang] = {ch: templates[lang][ch].format(**values) for ch in CHANNELS}
+        alerts[lang]["sms"] = enforce_sms_limit(alerts[lang]["sms"])
+
+    return AlertResult(
+        municipality=profile["name"],
+        risk_level=level,
+        alerts=alerts,
+        status=STATUS_FALLBACK,
+        provider="Pre-approved templates (data/fallback_alerts.json)",
+        reason=reason,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Live LLM
+# --------------------------------------------------------------------------- #
+SYSTEM_PROMPT = (
+    "You are an emergency communications officer for PROCIVY (Protección Civil de Yucatán, Mexico). "
+    "Write clear, calm, actionable hurricane alerts for the public. Never invent shelter names, "
+    "addresses or phone numbers other than the hotline provided. Use plain language suitable for "
+    "low-literacy audiences. Respond ONLY with valid JSON."
+)
+
+
+def build_prompt(profile: dict[str, Any], scenario: dict[str, Any]) -> str:
+    """Construct the user prompt describing the risk profile and output schema."""
+    factors = "; ".join(f["label"] for f in profile.get("top_factors", [])) or "n/a"
+    return f"""
+Generate hurricane emergency alerts for the municipality of {profile['name']} (locality: {profile.get('locality', profile['name'])}), Yucatán, Mexico.
+
+RISK PROFILE
+- Hurricane category: {scenario['category']}
+- Rainfall: {scenario['rainfall_mm_24h']:.0f} mm in 24 h
+- Storm surge: {scenario['storm_surge_m']:.1f} m
+- Landfall zone: {scenario['landfall_zone']}
+- AI risk score: {profile['risk_score']:.0f}/100 → risk level {profile['risk_level']}
+- Estimated exposed population: {profile.get('exposed_population', 0):,}
+- Top risk drivers: {factors}
+- Emergency hotline: {HOTLINE}
+
+ACTION GUIDANCE BY LEVEL
+- Critical: mandatory immediate evacuation to the nearest official shelter.
+- High: prepare to evacuate; low-lying/coastal residents go to shelter now.
+- Moderate: prepare go-bag, locate shelter, clear drains.
+- Low: stay informed, review family plan.
+
+OUTPUT: a JSON object with keys "es" (Spanish), "yua" (Yucatec Maya), "en" (English).
+Each language maps to an object with keys:
+- "sms": Cell Broadcast text, MAXIMUM 160 characters, starting with "PROCIVY".
+- "whatsapp": community message (80–140 words), may use emojis and *bold*, numbered actions.
+- "radio": 30-second radio script (~70–80 words), begin with "[ALERT TONE]" or equivalent.
+For Yucatec Maya use natural Yucatec Maya; keep "PROCIVY", the hotline and numbers unchanged.
+""".strip()
+
+
+def _call_gemini(prompt: str, api_key: str, model: str) -> str:
+    """Call Google Gemini via ``google-genai`` and return raw text."""
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=LLM_TIMEOUT_S * 1000))
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=0.4,
+            response_mime_type="application/json",
+        ),
+    )
+    return response.text or ""
+
+
+def _call_openai(prompt: str, api_key: str, model: str) -> str:
+    """Call OpenAI Chat Completions and return raw text."""
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key, timeout=LLM_TIMEOUT_S, max_retries=1)
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0.4,
+        response_format={"type": "json_object"},
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
+    )
+    return response.choices[0].message.content or ""
+
+
+def parse_llm_output(raw: str) -> dict[str, dict[str, str]]:
+    """Parse and validate the LLM JSON payload.
+
+    Raises:
+        ValueError: if any language/channel is missing or empty.
+    """
+    cleaned = re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
+    data = json.loads(cleaned)
+    alerts: dict[str, dict[str, str]] = {}
+    for lang in LANGUAGES:
+        block = data.get(lang)
+        if not isinstance(block, dict):
+            raise ValueError(f"Missing language block '{lang}'")
+        alerts[lang] = {}
+        for ch in CHANNELS:
+            text = str(block.get(ch, "")).strip()
+            if not text:
+                raise ValueError(f"Missing '{ch}' text for '{lang}'")
+            alerts[lang][ch] = text
+    return alerts
+
+
+def generate_llm_alerts(profile: dict[str, Any], scenario: dict[str, Any]) -> AlertResult:
+    """Generate alerts with the configured LLM (raises on any failure)."""
+    cfg = get_llm_config()
+    if not cfg["api_key"]:
+        raise RuntimeError("No API key configured")
+    prompt = build_prompt(profile, scenario)
+    caller = _call_openai if cfg["provider"] == "openai" else _call_gemini
+    alerts = parse_llm_output(caller(prompt, cfg["api_key"], cfg["model"]))
+
+    warnings: list[str] = []
+    for lang in LANGUAGES:
+        original = alerts[lang]["sms"]
+        alerts[lang]["sms"] = enforce_sms_limit(original)
+        if len(re.sub(r"\s+", " ", original).strip()) > SMS_MAX_CHARS:
+            warnings.append(f"{LANGUAGES[lang]} SMS exceeded {SMS_MAX_CHARS} chars and was trimmed.")
+
+    return AlertResult(
+        municipality=profile["name"],
+        risk_level=profile["risk_level"],
+        alerts=alerts,
+        status=STATUS_LIVE,
+        provider=f"{cfg['provider'].title()} · {cfg['model']}",
+        warnings=warnings,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Public entry point
+# --------------------------------------------------------------------------- #
+def generate_alerts(profile: dict[str, Any], scenario: dict[str, Any], online: bool = True) -> AlertResult:
+    """Generate multilingual alerts with automatic offline fallback.
+
+    Args:
+        profile: Municipality risk profile (row from ``predict_municipality_risks``).
+        scenario: Scenario dictionary (category, rainfall, surge, landfall zone).
+        online: False when Offline / Demo Mode or a telecom outage is active.
+
+    Returns:
+        An :class:`AlertResult`; never raises for LLM problems.
+    """
+    if not online:
+        return generate_fallback_alerts(profile, scenario, reason="Offline / Demo Mode active")
+    if not llm_available():
+        return generate_fallback_alerts(profile, scenario, reason="No LLM API key configured")
+    try:
+        return generate_llm_alerts(profile, scenario)
+    except Exception as exc:  # network, timeout, quota, malformed JSON, missing SDK…
+        detail = f"{type(exc).__name__}: {exc}"
+        return generate_fallback_alerts(profile, scenario, reason=f"LLM call failed → {detail[:160]}")
+```
+
+--------------------------------------------------------------------------------
+ARCHIVO 4: services/triage_engine.py
+Rol: Motor de priorización post-impacto, asignación voraz de brigadas (PROCIVY,
+     Cruz Roja, SEMAR, SEDENA Plan DN-III-E, CFE, DIF) y flujo Human-in-the-Loop.
+--------------------------------------------------------------------------------
+```python
+"""Post-impact incident triage with a Human-in-the-Loop dispatch workflow.
+
+Incidents are scored on a 0–100 priority scale combining severity, vulnerable
+population affected, infrastructure criticality, accessibility and the current
+AI risk level of the municipality. A greedy allocator then suggests a brigade
+for each incident (highest priority first) subject to unit availability.
+The final decision always belongs to the PROCIVY operator.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parent.parent
+INCIDENTS_PATH = ROOT / "data" / "sample_incidents.json"
+
+WEIGHTS: dict[str, float] = {
+    "severity": 0.45,
+    "vulnerable": 0.20,
+    "infrastructure": 0.15,
+    "access": 0.15,
+    "area_risk": 0.05,
+}
+# Life-safety rule: imminent threat to life (severity 5) always jumps the queue.
+LIFE_SAFETY_BONUS = 10.0
+ACCESS_SCORES: dict[str, float] = {"open": 0.2, "restricted": 0.6, "cut_off": 1.0}
+
+# Brigade types that can stand in when the preferred one is exhausted.
+ALTERNATES: dict[str, list[str]] = {
+    "Medical Evacuation": ["Water Rescue", "Search & Assessment"],
+    "Water Rescue": ["Medical Evacuation", "Search & Assessment"],
+    "Road Clearance": ["Search & Assessment"],
+    "Power Restoration": ["Shelter Logistics"],
+    "Shelter Logistics": ["Search & Assessment"],
+    "Search & Assessment": ["Road Clearance"],
+}
+
+STATUS_PENDING = "Pending review"
+STATUS_APPROVED = "Approved"
+STATUS_OVERRIDDEN = "Overridden"
+UNASSIGNED = "Queue – no unit available"
+
+
+def load_incident_data(path: Path = INCIDENTS_PATH) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    """Load incident reports and the brigade roster."""
+    with open(path, encoding="utf-8") as fh:
+        payload = json.load(fh)
+    return pd.DataFrame(payload["incidents"]), payload["brigades"]
+
+
+def priority_band(score: float) -> str:
+    """Translate a priority score into an operational band."""
+    if score >= 75:
+        return "P1 – Immediate"
+    if score >= 55:
+        return "P2 – Urgent"
+    if score >= 35:
+        return "P3 – Priority"
+    return "P4 – Routine"
+
+
+def score_incidents(incidents: pd.DataFrame, area_risk: dict[str, float] | None = None) -> pd.DataFrame:
+    """Compute a 0–100 priority score for every incident.
+
+    Args:
+        incidents: Incident reports.
+        area_risk: Optional mapping municipality -> AI risk score (0–100).
+
+    Returns:
+        Copy of ``incidents`` with ``priority_score`` and ``priority_band``,
+        sorted by descending priority.
+    """
+    area_risk = area_risk or {}
+    df = incidents.copy()
+    # Log scale so a handful of dialysis patients is not dwarfed by a city outage.
+    vuln_norm = df["vulnerable_people"].apply(lambda v: min(math.log10(v + 1) / math.log10(5000), 1.0))
+    df["priority_score"] = 100 * (
+        WEIGHTS["severity"] * df["severity"] / 5
+        + WEIGHTS["vulnerable"] * vuln_norm
+        + WEIGHTS["infrastructure"] * df["infrastructure_criticality"] / 5
+        + WEIGHTS["access"] * df["access"].map(ACCESS_SCORES).fillna(0.5)
+        + WEIGHTS["area_risk"] * df["municipality"].map(area_risk).fillna(50) / 100
+    )
+    df.loc[df["severity"] >= 5, "priority_score"] += LIFE_SAFETY_BONUS
+    df["priority_score"] = df["priority_score"].clip(upper=100).round(1)
+    df["priority_band"] = df["priority_score"].apply(priority_band)
+    return df.sort_values(["priority_score", "severity"], ascending=False).reset_index(drop=True)
+
+
+def suggest_allocation(scored: pd.DataFrame, brigades: list[dict[str, Any]]) -> pd.DataFrame:
+    """Greedy AI brigade suggestion in priority order.
+
+    Uses the required brigade type when units remain, otherwise an alternate
+    type, otherwise queues the incident.
+    """
+    available = {b["type"]: int(b["units"]) for b in brigades}
+    agencies = {b["type"]: b["agency"] for b in brigades}
+    suggestions, rationales = [], []
+    for row in scored.itertuples():
+        wanted = row.required_brigade
+        chosen, why = None, ""
+        if available.get(wanted, 0) > 0:
+            chosen, why = wanted, "Matches required capability"
+        else:
+            for alt in ALTERNATES.get(wanted, []):
+                if available.get(alt, 0) > 0:
+                    chosen, why = alt, f"{wanted} units exhausted → nearest alternate capability"
+                    break
+        if chosen:
+            available[chosen] -= 1
+            suggestions.append(f"{chosen} ({agencies[chosen]})")
+        else:
+            suggestions.append(UNASSIGNED)
+            why = f"All {wanted} and alternate units committed to higher-priority incidents"
+        rationales.append(why)
+    out = scored.copy()
+    out["ai_suggestion"] = suggestions
+    out["ai_rationale"] = rationales
+    return out
+
+
+def brigade_options(brigades: list[dict[str, Any]]) -> list[str]:
+    """Labels an operator can choose from when overriding."""
+    return [f"{b['type']} ({b['agency']})" for b in brigades] + [UNASSIGNED, "Hold – request more information"]
+
+
+def init_decisions(incident_ids: list[str], state: dict[str, Any]) -> None:
+    """Ensure every incident has a decision record in session state."""
+    decisions = state.setdefault("triage_decisions", {})
+    for iid in incident_ids:
+        decisions.setdefault(iid, {"status": STATUS_PENDING, "assigned": None, "note": "", "time": None})
+    state.setdefault("triage_audit", [])
+
+
+def record_decision(state: dict[str, Any], incident_id: str, status: str, assigned: str, note: str = "", operator: str = "PROCIVY operator") -> None:
+    """Store an operator decision and append it to the audit log."""
+    stamp = datetime.now().strftime("%H:%M:%S")
+    state["triage_decisions"][incident_id] = {"status": status, "assigned": assigned, "note": note, "time": stamp}
+    state["triage_audit"].insert(
+        0, {"time": stamp, "incident": incident_id, "decision": status, "assigned": assigned, "operator": operator, "note": note}
+    )
+
+
+def reset_decisions(state: dict[str, Any]) -> None:
+    """Clear all operator decisions and the audit log."""
+    state.pop("triage_decisions", None)
+    state.pop("triage_audit", None)
+```
+
+--------------------------------------------------------------------------------
+ARCHIVO 5: data/municipalities.json
+Rol: 8 municipios clave de Yucatán con sus indicadores base (población, % maya,
+     costa, vulnerabilidad a inundación, capacidad de albergues y elevación).
+--------------------------------------------------------------------------------
+```json
+{
+  "metadata": {
+    "description": "Baseline indicators for 8 Yucatán municipalities used by the Yucatán EWRS prototype.",
+    "disclaimer": "Baseline indicators are rounded approximations for prototype demonstration only. A production deployment must ingest official, up-to-date data.",
+    "reference_sources": [
+      "INEGI – Censo de Población y Vivienda 2020 (population, indigenous-language speakers)",
+      "CONAGUA / Servicio Meteorológico Nacional (hurricane tracks, rainfall, storm surge)",
+      "PROCIVY – Coordinación Estatal de Protección Civil de Yucatán (shelters, risk atlas)"
+    ],
+    "coordinates_note": "Coordinates mark the main settlement at risk (coastal port for municipalities listed with a locality in parentheses)."
+  },
+  "municipalities": [
+    {
+      "id": "progreso",
+      "name": "Progreso",
+      "locality": "Progreso",
+      "lat": 21.2817,
+      "lon": -89.6650,
+      "population": 66000,
+      "maya_speaking_pct": 6.0,
+      "coastal": true,
+      "flood_vulnerability": 0.78,
+      "shelter_capacity": 9000,
+      "elevation_m": 2
+    },
+    {
+      "id": "celestun",
+      "name": "Celestún",
+      "locality": "Celestún",
+      "lat": 20.8590,
+      "lon": -90.3990,
+      "population": 8200,
+      "maya_speaking_pct": 9.0,
+      "coastal": true,
+      "flood_vulnerability": 0.85,
+      "shelter_capacity": 1500,
+      "elevation_m": 2
+    },
+    {
+      "id": "hunucma",
+      "name": "Hunucmá (Sisal)",
+      "locality": "Sisal",
+      "lat": 21.1650,
+      "lon": -90.0310,
+      "population": 35000,
+      "maya_speaking_pct": 18.0,
+      "coastal": true,
+      "flood_vulnerability": 0.80,
+      "shelter_capacity": 4000,
+      "elevation_m": 3
+    },
+    {
+      "id": "rio_lagartos",
+      "name": "Río Lagartos",
+      "locality": "Río Lagartos",
+      "lat": 21.5970,
+      "lon": -88.1580,
+      "population": 3500,
+      "maya_speaking_pct": 12.0,
+      "coastal": true,
+      "flood_vulnerability": 0.82,
+      "shelter_capacity": 800,
+      "elevation_m": 2
+    },
+    {
+      "id": "tizimin",
+      "name": "Tizimín (El Cuyo)",
+      "locality": "El Cuyo",
+      "lat": 21.5160,
+      "lon": -87.6800,
+      "population": 80000,
+      "maya_speaking_pct": 38.0,
+      "coastal": true,
+      "flood_vulnerability": 0.70,
+      "shelter_capacity": 9000,
+      "elevation_m": 4
+    },
+    {
+      "id": "merida",
+      "name": "Mérida",
+      "locality": "Mérida",
+      "lat": 20.9670,
+      "lon": -89.6230,
+      "population": 995000,
+      "maya_speaking_pct": 6.5,
+      "coastal": false,
+      "flood_vulnerability": 0.35,
+      "shelter_capacity": 60000,
+      "elevation_m": 9
+    },
+    {
+      "id": "valladolid",
+      "name": "Valladolid",
+      "locality": "Valladolid",
+      "lat": 20.6890,
+      "lon": -88.2010,
+      "population": 85000,
+      "maya_speaking_pct": 40.0,
+      "coastal": false,
+      "flood_vulnerability": 0.30,
+      "shelter_capacity": 8000,
+      "elevation_m": 25
+    },
+    {
+      "id": "tekax",
+      "name": "Tekax",
+      "locality": "Tekax",
+      "lat": 20.2020,
+      "lon": -89.2880,
+      "population": 44000,
+      "maya_speaking_pct": 52.0,
+      "coastal": false,
+      "flood_vulnerability": 0.40,
+      "shelter_capacity": 5000,
+      "elevation_m": 40
+    }
+  ]
+}
+```
+
+--------------------------------------------------------------------------------
+ARCHIVO 6: data/fallback_alerts.json
+Rol: Plantillas de alertas trilingües (Español, Maya Yucateco, Inglés)
+     preaprobadas para los 4 niveles de riesgo y 3 canales (modo offline).
+--------------------------------------------------------------------------------
+```json
+{
+  "metadata": {
+    "description": "Pre-approved alert templates used when the LLM is unavailable (no API key, API failure/timeout, Offline / Demo Mode, or telecom outage).",
+    "placeholders": ["{municipality}", "{locality}", "{category}", "{risk_level}", "{risk_score}", "{rainfall}", "{surge}", "{exposed}", "{top_factor}", "{hotline}"],
+    "maya_disclaimer": "Yucatec Maya texts are prototype drafts and require native-speaker / INDEMAYA validation before real deployment."
+  },
+  "risk_labels": {
+    "es": {"Low": "BAJO", "Moderate": "MODERADO", "High": "ALTO", "Critical": "CRÍTICO"},
+    "yua": {"Low": "CHAN SAJBE'ENTSIL", "Moderate": "SAJBE'ENTSIL", "High": "NOJOCH SAJBE'ENTSIL", "Critical": "JACH NOJOCH SAJBE'ENTSIL"},
+    "en": {"Low": "LOW", "Moderate": "MODERATE", "High": "HIGH", "Critical": "CRITICAL"}
+  },
+  "templates": {
+    "Critical": {
+      "es": {
+        "sms": "PROCIVY ALERTA {risk_level}: Huracán Cat {category} en {municipality}. EVACÚE YA al albergue oficial más cercano. Lleve documentos y agua. Emergencias {hotline}",
+        "whatsapp": "🔴 *ALERTA {risk_level} – {municipality}*\n\nHuracán categoría {category} con lluvias de {rainfall} mm en 24 h y marea de tormenta de hasta {surge} m. Nivel de riesgo: {risk_score}/100.\n\n*EVACUACIÓN OBLIGATORIA AHORA:*\n1️⃣ Diríjase al albergue oficial más cercano (lista PROCIVY).\n2️⃣ Lleve documentos en bolsa plástica, medicamentos, agua y linterna.\n3️⃣ Ayude a personas mayores, niñas, niños y personas con discapacidad.\n4️⃣ Corte la luz y el gas antes de salir.\n\n⚠️ Principal factor de riesgo: {top_factor}.\nNo cruce calles inundadas. Siga solo canales oficiales.\n📞 Emergencias: {hotline}",
+        "radio": "[SONIDO DE ALERTA] Atención, {municipality}. Protección Civil de Yucatán emite ALERTA {risk_level}. Un huracán categoría {category} se acerca con lluvias de {rainfall} milímetros y marea de tormenta de {surge} metros. La evacuación es OBLIGATORIA. Diríjase ahora mismo al albergue oficial más cercano. Lleve documentos, medicinas y agua. Ayude a sus vecinos mayores. No espere a que empiece el viento fuerte. Repetimos: evacúe ya. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY {risk_level}: Chak ik'al K{category} ku taal {municipality}. Jóok'en BEJLA'E' ti' albergue. Ch'a' a ju'unil yéetel ja'. Tel {hotline}",
+        "whatsapp": "🔴 *{risk_level} – {municipality}*\n\nChak ik'al (huracán) categoría {category} ku taal. Yaan ya'abach cháak ({rainfall} mm) yéetel u nojochtal k'áak'náab ({surge} m). Sajbe'entsil: {risk_score}/100.\n\n*K'A'ABET A JÓOK'OL BEJLA'E':*\n1️⃣ Xeen ti' u albergueil a kaajal (PROCIVY).\n2️⃣ Ch'a' a ju'unilo'ob, a ts'aako'ob, ja' yéetel linterna.\n3️⃣ Áant le nojoch máako'ob yéetel le paalalo'obo'.\n4️⃣ Tuup u sáasilil yéetel u gasil a wotoch.\n\n⚠️ U asab nojoch sajbe'entsil: {top_factor}.\nMa' a máan tu'ux yaan ja'. Ka'aj u'uyik chéen u t'aan Protección Civil.\n📞 {hotline}",
+        "radio": "[SONIDO DE ALERTA] U'uyej, kaaj {municipality}. Protección Civil Yucatán ku ya'alik: {risk_level}. Juntúul chak ik'al categoría {category} ku taal, yéetel {rainfall} milímetros cháak yéetel {surge} metros k'áak'náab. K'a'abet a jóok'ol bejla'e'. Xeen séeba'an ti' u albergueil a kaajal. Ch'a' a ju'unilo'ob, a ts'aako'ob yéetel ja'. Áant a nojoch láak'o'ob. Ma' a pa'atik u k'uchul u muuk' le iik'o'. Tu ka'atéen: jóok'en bejla'e'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY {risk_level} ALERT: Cat {category} hurricane, {municipality}. EVACUATE NOW to the nearest official shelter. Bring IDs and water. Emergency {hotline}",
+        "whatsapp": "🔴 *{risk_level} ALERT – {municipality}*\n\nCategory {category} hurricane with {rainfall} mm of rain in 24 h and storm surge up to {surge} m. Risk score: {risk_score}/100.\n\n*MANDATORY EVACUATION NOW:*\n1️⃣ Go to the nearest official shelter (PROCIVY list).\n2️⃣ Bring documents in a plastic bag, medicine, water and a flashlight.\n3️⃣ Help older adults, children and people with disabilities.\n4️⃣ Switch off power and gas before leaving.\n\n⚠️ Main risk driver: {top_factor}.\nDo not cross flooded streets. Follow official channels only.\n📞 Emergency: {hotline}",
+        "radio": "[ALERT TONE] Attention, {municipality}. Yucatán Civil Protection has issued a {risk_level} ALERT. A Category {category} hurricane is approaching with {rainfall} millimetres of rain and a {surge}-metre storm surge. Evacuation is MANDATORY. Go to the nearest official shelter right now. Bring documents, medicine and water. Help your elderly neighbours. Do not wait for strong winds to begin. Again: evacuate now. Emergency line: {hotline}."
+      }
+    },
+    "High": {
+      "es": {
+        "sms": "PROCIVY ALERTA {risk_level}: Huracán Cat {category}, {municipality}. Prepárese para evacuar. Zonas bajas: acudan al albergue. Emergencias {hotline}",
+        "whatsapp": "🟠 *ALERTA {risk_level} – {municipality}*\n\nHuracán categoría {category}. Lluvia esperada: {rainfall} mm/24 h · Marea de tormenta: {surge} m · Riesgo: {risk_score}/100.\n\n*PREPÁRESE PARA EVACUAR:*\n✅ Si vive en zona baja o costera, acuda al albergue oficial desde ahora.\n✅ Tenga lista su mochila de emergencia (documentos, medicinas, agua, radio de pilas).\n✅ Asegure techos, ventanas y objetos sueltos.\n✅ Cargue su celular y guarde números de emergencia.\n\n⚠️ Principal factor de riesgo: {top_factor}.\n📻 Escuche la radio comunitaria para actualizaciones.\n📞 Emergencias: {hotline}",
+        "radio": "[SONIDO DE ALERTA] Atención, {municipality}. Protección Civil de Yucatán emite ALERTA {risk_level} por huracán categoría {category}. Se esperan lluvias de {rainfall} milímetros y marea de tormenta de {surge} metros. Si vive en zona baja o cerca del mar, acuda ya al albergue oficial. Todos los demás: preparen su mochila con documentos, medicinas y agua, y aseguren techos y ventanas. Manténgase atento a esta frecuencia. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY {risk_level}: Chak ik'al K{category}, {municipality}. Líik'sa' a ba'alo'ob, yaan u jóok'ol. Tu'ux kaabal: xeen albergue. Tel {hotline}",
+        "whatsapp": "🟠 *{risk_level} – {municipality}*\n\nChak ik'al categoría {category}. Cháak: {rainfall} mm · K'áak'náab: {surge} m · Sajbe'entsil: {risk_score}/100.\n\n*LÍIK'SA' A BA'ALO'OB UTI'AL A JÓOK'OL:*\n✅ Wa kaajakbal tu jáal k'áak'náab wa tu'ux kaabal, xeen ti' albergue bejla'e'.\n✅ Ts'áa ichil a mochila: a ju'unilo'ob, ts'aak, ja' yéetel radio.\n✅ Ts'áa muuk' u yoot'el a wotoch yéetel u ventanailo'ob.\n✅ Ts'áa u muuk' a celular.\n\n⚠️ U asab nojoch sajbe'entsil: {top_factor}.\n📻 U'uy u radioil a kaajal.\n📞 {hotline}",
+        "radio": "[SONIDO DE ALERTA] U'uyej, kaaj {municipality}. Protección Civil Yucatán ku ya'alik {risk_level} tu yo'olal chak ik'al categoría {category}. Yaan {rainfall} milímetros cháak yéetel {surge} metros k'áak'náab. Wa kaajakbal tu jáal k'áak'náab, xeen bejla'e' ti' albergue. Tuláakal u jeel máako'ob: líik'sa' a mochila yéetel a ju'unilo'ob, ts'aak yéetel ja'. U'uy le radioa'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY {risk_level} ALERT: Cat {category} hurricane, {municipality}. Prepare to evacuate. Low-lying areas: go to shelter now. Emergency {hotline}",
+        "whatsapp": "🟠 *{risk_level} ALERT – {municipality}*\n\nCategory {category} hurricane. Expected rain: {rainfall} mm/24 h · Storm surge: {surge} m · Risk: {risk_score}/100.\n\n*PREPARE TO EVACUATE:*\n✅ If you live in a low-lying or coastal area, go to the official shelter now.\n✅ Keep your go-bag ready (documents, medicine, water, battery radio).\n✅ Secure roofs, windows and loose objects.\n✅ Charge your phone and save emergency numbers.\n\n⚠️ Main risk driver: {top_factor}.\n📻 Listen to community radio for updates.\n📞 Emergency: {hotline}",
+        "radio": "[ALERT TONE] Attention, {municipality}. Yucatán Civil Protection has issued a {risk_level} ALERT for a Category {category} hurricane. Expect {rainfall} millimetres of rain and a {surge}-metre storm surge. If you live in a low-lying or coastal area, go to the official shelter now. Everyone else: pack documents, medicine and water, and secure roofs and windows. Stay tuned to this station. Emergency line: {hotline}."
+      }
+    },
+    "Moderate": {
+      "es": {
+        "sms": "PROCIVY AVISO {risk_level}: Huracán Cat {category} cerca de {municipality}. Prepare su mochila y ubique su albergue. Info oficial: radio local. {hotline}",
+        "whatsapp": "🟡 *AVISO {risk_level} – {municipality}*\n\nHuracán categoría {category} en la región. Lluvia esperada: {rainfall} mm/24 h · Riesgo: {risk_score}/100.\n\n*MANTÉNGASE PREPARADO:*\n• Ubique el albergue oficial más cercano.\n• Prepare agua, alimentos no perecederos y medicinas para 3 días.\n• Limpie desagües y retire objetos que puedan volar.\n\n⚠️ Factor a vigilar: {top_factor}.\n📞 Emergencias: {hotline}",
+        "radio": "Atención, {municipality}. Protección Civil de Yucatán mantiene AVISO {risk_level} por huracán categoría {category}. Se esperan lluvias de hasta {rainfall} milímetros. Le pedimos ubicar su albergue más cercano, preparar agua, alimentos y medicinas para tres días, y limpiar los desagües de su calle. Siga esta frecuencia para nuevas indicaciones. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY {risk_level}: Chak ik'al K{category} naats' ti' {municipality}. Líik'sa' a mochila, kaxt a albergue. U'uy radio. Tel {hotline}",
+        "whatsapp": "🟡 *{risk_level} – {municipality}*\n\nChak ik'al categoría {category} yaan naats'. Cháak: {rainfall} mm · Sajbe'entsil: {risk_score}/100.\n\n*LÍIK'SA' A BA'ALO'OB:*\n• Kaxt tu'ux yaan u albergueil a kaajal.\n• Líik'sa' ja', janal yéetel ts'aak uti'al óoxp'éel k'iin.\n• Míis u bejil ja' yéetel ch'a' ba'alo'ob ku páajtal u xiik'nal.\n\n⚠️ Ilawil: {top_factor}.\n📞 {hotline}",
+        "radio": "U'uyej, kaaj {municipality}. Protección Civil Yucatán ku ya'alik {risk_level} tu yo'olal chak ik'al categoría {category}. Yaan tak {rainfall} milímetros cháak. Kaxt tu'ux yaan a albergue, líik'sa' ja', janal yéetel ts'aak uti'al óoxp'éel k'iin, yéetel míis u bejil ja' ti' a calle. U'uy le radioa'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY {risk_level} ADVISORY: Cat {category} hurricane near {municipality}. Pack a go-bag and locate your shelter. Updates on local radio. {hotline}",
+        "whatsapp": "🟡 *{risk_level} ADVISORY – {municipality}*\n\nCategory {category} hurricane in the region. Expected rain: {rainfall} mm/24 h · Risk: {risk_score}/100.\n\n*STAY PREPARED:*\n• Locate your nearest official shelter.\n• Store water, non-perishable food and medicine for 3 days.\n• Clear drains and remove objects that could become projectiles.\n\n⚠️ Factor to watch: {top_factor}.\n📞 Emergency: {hotline}",
+        "radio": "Attention, {municipality}. Yucatán Civil Protection maintains a {risk_level} ADVISORY for a Category {category} hurricane. Up to {rainfall} millimetres of rain are expected. Please locate your nearest shelter, store water, food and medicine for three days, and clear the drains on your street. Stay tuned to this station for further instructions. Emergency line: {hotline}."
+      }
+    },
+    "Low": {
+      "es": {
+        "sms": "PROCIVY INFORMA: Riesgo {risk_level} en {municipality} por huracán Cat {category}. Manténgase informado por canales oficiales. {hotline}",
+        "whatsapp": "🟢 *INFORMATIVO – {municipality}*\n\nRiesgo {risk_level} ({risk_score}/100) por huracán categoría {category}.\n\n• Revise su plan familiar de emergencia.\n• Tenga a la mano un radio de pilas.\n• Siga las actualizaciones oficiales de PROCIVY.\n\n📞 Emergencias: {hotline}",
+        "radio": "Buenas tardes, {municipality}. Protección Civil de Yucatán informa que el riesgo para su municipio es {risk_level} ante el huracán categoría {category}. No hay indicación de evacuación. Le recomendamos revisar su plan familiar de emergencia y mantenerse atento a esta frecuencia. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY: {risk_level} ti' {municipality} tu yo'olal chak ik'al K{category}. U'uy u t'aan Protección Civil. Tel {hotline}",
+        "whatsapp": "🟢 *K'A'AJSAJ T'AAN – {municipality}*\n\n{risk_level} ({risk_score}/100) tu yo'olal chak ik'al categoría {category}.\n\n• Xak'al a plan yéetel a láak'o'ob.\n• Ts'áa naats' juntúul radio yéetel pila.\n• U'uy u t'aan PROCIVY.\n\n📞 {hotline}",
+        "radio": "Ma'alob chíinil k'iin, kaaj {municipality}. Protección Civil Yucatán ku ya'alik {risk_level} ti' a kaajal tu yo'olal chak ik'al categoría {category}. Ma' k'a'abet a jóok'ol. Xak'al a plan yéetel a láak'o'ob yéetel u'uy le radioa'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY INFO: {risk_level} risk in {municipality} from Cat {category} hurricane. Stay informed through official channels. {hotline}",
+        "whatsapp": "🟢 *INFORMATION – {municipality}*\n\n{risk_level} risk ({risk_score}/100) from a Category {category} hurricane.\n\n• Review your family emergency plan.\n• Keep a battery-powered radio at hand.\n• Follow official PROCIVY updates.\n\n📞 Emergency: {hotline}",
+        "radio": "Good afternoon, {municipality}. Yucatán Civil Protection reports that the risk for your municipality is {risk_level} from the Category {category} hurricane. There is no evacuation order. We recommend reviewing your family emergency plan and staying tuned to this station. Emergency line: {hotline}."
+      }
+    }
+  }
+}
+```
+
+--------------------------------------------------------------------------------
+ARCHIVO 7: data/sample_incidents.json
+Rol: 10 reportes simulados post-impacto y el inventario de brigadas disponibles.
+--------------------------------------------------------------------------------
+```json
+{
+  "metadata": {
+    "description": "Synthetic post-impact incident reports for the triage demo (not real events).",
+    "fields": {
+      "severity": "1 (minor) – 5 (life-threatening)",
+      "infrastructure_criticality": "1 (local) – 5 (regional lifeline)",
+      "access": "open | restricted | cut_off"
+    }
+  },
+  "brigades": [
+    {"type": "Medical Evacuation", "agency": "Cruz Roja / SSY", "units": 2},
+    {"type": "Water Rescue", "agency": "SEMAR", "units": 1},
+    {"type": "Road Clearance", "agency": "SEDENA (Plan DN-III-E) / SCT", "units": 2},
+    {"type": "Power Restoration", "agency": "CFE", "units": 1},
+    {"type": "Shelter Logistics", "agency": "DIF Yucatán / PROCIVY", "units": 2},
+    {"type": "Search & Assessment", "agency": "PROCIVY municipal units", "units": 1}
+  ],
+  "incidents": [
+    {
+      "id": "INC-001",
+      "title": "Dialysis patients stranded – medical evacuation needed",
+      "municipality": "Celestún",
+      "type": "Medical",
+      "description": "Three dialysis patients and one pregnant woman in labour cannot reach Hospital O'Horán; road to Kinchil flooded.",
+      "severity": 5,
+      "people_affected": 4,
+      "vulnerable_people": 4,
+      "infrastructure_criticality": 3,
+      "access": "cut_off",
+      "required_brigade": "Medical Evacuation",
+      "reported_at": "06:42",
+      "source": "Community radio relay"
+    },
+    {
+      "id": "INC-002",
+      "title": "Coastal highway Progreso–Telchac blocked by debris and sand",
+      "municipality": "Progreso",
+      "type": "Road",
+      "description": "Km 12–18 of the coastal road buried under sand and fallen poles; isolates Chicxulub Puerto and Uaymitún.",
+      "severity": 4,
+      "people_affected": 6500,
+      "vulnerable_people": 900,
+      "infrastructure_criticality": 4,
+      "access": "restricted",
+      "required_brigade": "Road Clearance",
+      "reported_at": "07:05",
+      "source": "SEDENA patrol"
+    },
+    {
+      "id": "INC-003",
+      "title": "Shelter at 96% capacity – Escuela secundaria (Sisal)",
+      "municipality": "Hunucmá (Sisal)",
+      "type": "Shelter",
+      "description": "Shelter receiving evacuees from coastal colonias; water and bedding running low, 40 more families arriving.",
+      "severity": 3,
+      "people_affected": 610,
+      "vulnerable_people": 180,
+      "infrastructure_criticality": 3,
+      "access": "open",
+      "required_brigade": "Shelter Logistics",
+      "reported_at": "07:18",
+      "source": "Shelter coordinator (SMS)"
+    },
+    {
+      "id": "INC-004",
+      "title": "Power substation flooded – Valladolid east",
+      "municipality": "Valladolid",
+      "type": "Power",
+      "description": "Substation flooded with 0.6 m of water; outage affects General Hospital backup feed and water pumping station.",
+      "severity": 4,
+      "people_affected": 32000,
+      "vulnerable_people": 2600,
+      "infrastructure_criticality": 5,
+      "access": "open",
+      "required_brigade": "Power Restoration",
+      "reported_at": "07:31",
+      "source": "CFE telemetry"
+    },
+    {
+      "id": "INC-005",
+      "title": "Families on rooftops – storm surge in fishing neighbourhood",
+      "municipality": "Río Lagartos",
+      "type": "Rescue",
+      "description": "Approx. 25 people including children on rooftops near the estuary; water level still rising.",
+      "severity": 5,
+      "people_affected": 25,
+      "vulnerable_people": 11,
+      "infrastructure_criticality": 2,
+      "access": "cut_off",
+      "required_brigade": "Water Rescue",
+      "reported_at": "07:40",
+      "source": "Fishermen cooperative VHF radio"
+    },
+    {
+      "id": "INC-006",
+      "title": "Urban flooding in underpass – vehicles trapped",
+      "municipality": "Mérida",
+      "type": "Road",
+      "description": "Periférico underpass flooded (1.2 m); two vehicles trapped, drivers evacuated by bystanders.",
+      "severity": 3,
+      "people_affected": 120,
+      "vulnerable_people": 10,
+      "infrastructure_criticality": 4,
+      "access": "restricted",
+      "required_brigade": "Road Clearance",
+      "reported_at": "07:52",
+      "source": "C5 Yucatán CCTV"
+    },
+    {
+      "id": "INC-007",
+      "title": "Elderly residents without medication – Maya-speaking comisaría",
+      "municipality": "Tekax",
+      "type": "Medical",
+      "description": "Comisaría reports 15 elderly residents (Maya-speaking only) without insulin/hypertension medication; road partially open.",
+      "severity": 4,
+      "people_affected": 15,
+      "vulnerable_people": 15,
+      "infrastructure_criticality": 2,
+      "access": "restricted",
+      "required_brigade": "Medical Evacuation",
+      "reported_at": "08:03",
+      "source": "Comisario via satellite phone"
+    },
+    {
+      "id": "INC-008",
+      "title": "Communication tower down – El Cuyo isolated",
+      "municipality": "Tizimín (El Cuyo)",
+      "type": "Telecom",
+      "description": "Only cell tower collapsed; no news from approx. 1,800 residents since 05:00. Status unknown.",
+      "severity": 4,
+      "people_affected": 1800,
+      "vulnerable_people": 300,
+      "infrastructure_criticality": 4,
+      "access": "cut_off",
+      "required_brigade": "Search & Assessment",
+      "reported_at": "08:10",
+      "source": "Telecom operator NOC"
+    },
+    {
+      "id": "INC-009",
+      "title": "Fallen trees on rural road – Tizimín ranch area",
+      "municipality": "Tizimín (El Cuyo)",
+      "type": "Road",
+      "description": "Several trees across secondary road to ejidos; no injuries reported, alternative route available.",
+      "severity": 2,
+      "people_affected": 400,
+      "vulnerable_people": 40,
+      "infrastructure_criticality": 2,
+      "access": "restricted",
+      "required_brigade": "Road Clearance",
+      "reported_at": "08:22",
+      "source": "Citizen WhatsApp report"
+    },
+    {
+      "id": "INC-010",
+      "title": "Shelter generator failure – Mérida sports complex",
+      "municipality": "Mérida",
+      "type": "Shelter",
+      "description": "Backup generator failed at shelter hosting 1,100 people; refrigerated medicines at risk within 4 h.",
+      "severity": 3,
+      "people_affected": 1100,
+      "vulnerable_people": 260,
+      "infrastructure_criticality": 3,
+      "access": "open",
+      "required_brigade": "Power Restoration",
+      "reported_at": "08:35",
+      "source": "DIF shelter staff"
+    }
+  ]
+}
+```
+
+--------------------------------------------------------------------------------
+ARCHIVO 8: scripts/verify.py
+Rol: Script automatizado de verificación pre-presentación (prueba modelo ML,
+     alertas offline, motor de triaje y ejecución headless completa en Streamlit).
+--------------------------------------------------------------------------------
+```python
+"""Pre-demo verification for Yucatán EWRS.
+
+Checks that:
+  1. The ML model trains, saves, reloads and predicts sane values.
+  2. The fallback alert generator works with no API key (all levels, SMS <= 160).
+  3. The triage engine scores and allocates incidents.
+  4. ``app.py`` compiles and runs end-to-end in Streamlit's headless AppTest.
+
+Usage:  python scripts/verify.py
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+# Guarantee the "no API key" path regardless of the local .env.
+for var in ("GEMINI_API_KEY", "OPENAI_API_KEY"):
+    os.environ[var] = ""
+
+
+def check(label: str, condition: bool) -> None:
+    """Print a pass/fail line and abort on failure."""
+    print(f"  {'PASS' if condition else 'FAIL'}  {label}")
+    if not condition:
+        sys.exit(1)
+
+
+def verify_model() -> None:
+    from models.risk_model import ARTIFACT_PATH, Scenario, load_model, predict_municipality_risks, train_model
+
+    print("[1] ML risk model")
+    art = train_model(save=True)
+    check(f"trained RandomForest (R²={art['metrics']['r2']:.3f}, MAE={art['metrics']['mae']:.2f})", art["metrics"]["r2"] > 0.8)
+    check("artifact saved with joblib", ARTIFACT_PATH.exists())
+    art = load_model()
+    df = predict_municipality_risks(Scenario(5, 450, 5.0, "North Coast"), art)
+    check("8 municipalities predicted", len(df) == 8)
+    check("scores within 0–100", df["risk_score"].between(0, 100).all())
+    check("3 risk drivers per municipality", all(len(f) == 3 for f in df["top_factors"]))
+    calm = predict_municipality_risks(Scenario(1, 60, 0.3, "East Coast"), art)
+    check("Cat 5 scenario riskier than Cat 1", df["risk_score"].mean() > calm["risk_score"].mean())
+
+
+def verify_alerts() -> None:
+    from models.risk_model import Scenario, load_model, predict_municipality_risks
+    from services.alert_generator import CHANNELS, LANGUAGES, SMS_MAX_CHARS, STATUS_FALLBACK, generate_alerts, llm_available
+
+    print("[2] Alert generator (no API key)")
+    check("no API key detected", not llm_available())
+    scenario = {"category": 4, "rainfall_mm_24h": 320.0, "storm_surge_m": 3.5, "landfall_zone": "West Coast"}
+    df = predict_municipality_risks(Scenario(**scenario), load_model())
+    for level in ("Critical", "High", "Moderate", "Low"):
+        for _, row in df.iterrows():
+            profile = row.to_dict() | {"risk_level": level}
+            res = generate_alerts(profile, scenario, online=True)
+            assert res.status == STATUS_FALLBACK, res
+            for lang in LANGUAGES:
+                for ch in CHANNELS:
+                    text = res.alerts[lang][ch]
+                    assert text and "{" not in text, (level, lang, ch, text)
+                assert len(res.alerts[lang]["sms"]) <= SMS_MAX_CHARS, res.alerts[lang]["sms"]
+    check("fallback used for all 4 levels × 8 municipalities × 3 languages × 3 channels", True)
+    check("all SMS <= 160 characters and placeholders filled", True)
+    offline = generate_alerts(df.iloc[0].to_dict(), scenario, online=False)
+    check("Offline / Demo Mode forces fallback", offline.status == STATUS_FALLBACK)
+
+
+def verify_triage() -> None:
+    from services.triage_engine import load_incident_data, score_incidents, suggest_allocation
+
+    print("[3] Triage engine")
+    incidents, brigades = load_incident_data()
+    queue = suggest_allocation(score_incidents(incidents), brigades)
+    check(f"{len(queue)} incidents scored and ranked", queue["priority_score"].is_monotonic_decreasing)
+    check("every incident has an AI suggestion", queue["ai_suggestion"].notna().all())
+
+
+def verify_app() -> None:
+    from streamlit.testing.v1 import AppTest
+
+    print("[4] Streamlit app")
+    compile((ROOT / "app.py").read_text(encoding="utf-8"), "app.py", "exec")
+    check("app.py compiles", True)
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
+    check("app.py runs headless without exceptions", not at.exception)
+    gen = next(b for b in at.button if b.label.startswith("📣"))
+    gen.click().run()
+    check("Generate Alert works (offline)", not at.exception)
+    for t in at.toggle:
+        t.set_value(True)
+    at.run()
+    check("outage + offline toggles render without exceptions", not at.exception)
+    approve = next(b for b in at.button if b.label == "Approve")
+    approve.click().run()
+    check("HITL approve action works", not at.exception and len(at.session_state["triage_audit"]) == 1)
+
+
+if __name__ == "__main__":
+    verify_model()
+    verify_alerts()
+    verify_triage()
+    verify_app()
+    print("\nAll checks passed ✅")
+```
+
+--------------------------------------------------------------------------------
+ARCHIVOS DE CONFIGURACIÓN, DESPLIEGUE Y DOCUMENTACIÓN:
+--------------------------------------------------------------------------------
+
+ARCHIVO 9: .env.example
+```dotenv
+# Copy to .env and fill in ONE provider. Leave keys empty to run fully offline.
+# LLM_PROVIDER: "gemini" or "openai"
+LLM_PROVIDER=gemini
+
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+```
+
+ARCHIVO 10: requirements.txt
+```text
+# Core app
+streamlit>=1.36
+pandas>=2.0
+numpy>=1.26
+scikit-learn>=1.4
+joblib>=1.3
+plotly>=5.20
+python-dotenv>=1.0
+
+# Optional LLM providers (app runs fully offline without them)
+google-genai>=0.3
+openai>=1.30
+```
+
+ARCHIVO 11: Dockerfile
+```dockerfile
+# Yucatán EWRS – Streamlit demo image
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+WORKDIR /app
+
+# Dependencies first so this layer is cached across code changes
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Bake the trained model into the image so container startup is instant
+RUN python -m models.risk_model
+
+# Run as an unprivileged user
+RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8501
+
+# python:slim has no curl, so probe the health endpoint with the stdlib
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=4).status == 200 else 1)"
+
+CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
+```
+
+ARCHIVO 12: docker-compose.yml
+```yaml
+services:
+  ewrs:
+    build: .
+    image: yucatan-ewrs:latest
+    container_name: yucatan-ewrs
+    ports:
+      - "8501:8501"
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+```
+
+ARCHIVO 13: .streamlit/config.toml
+```toml
+[theme]
+primaryColor = "#3B6EA8"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+```
+
+ARCHIVO 14: README.md
+```markdown
+# Yucatán EWRS – Hurricane Early Warning & Response System
+
+A Streamlit MVP built for a Digital Economy presentation. It shows how an AI layer (hyperlocal ML risk scoring, multilingual LLM alerts and human-in-the-loop triage) can sit on top of the simple protocols Yucatán already uses: Cell Broadcast, community radio, printed maps and drainage maintenance.
+
+> **Works 100% offline.** If no API key is set, the LLM call fails or times out, Offline / Demo Mode is on, or a telecom outage is simulated, the app switches to the pre-approved templates in `data/fallback_alerts.json`.
+```
+
+================================================================================
+FIN DEL CONTEXTO DEL PROYECTO YUCATÁN EWRS
+================================================================================

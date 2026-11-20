@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "description": "Baseline indicators for 8 Yucatán municipalities used by the Yucatán EWRS prototype.",
+    "disclaimer": "Baseline indicators are rounded approximations for prototype demonstration only. A production deployment must ingest official, up-to-date data.",
+    "reference_sources": [
+      "INEGI – Censo de Población y Vivienda 2020 (population, indigenous-language speakers)",
+      "CONAGUA / Servicio Meteorológico Nacional (hurricane tracks, rainfall, storm surge)",
+      "PROCIVY – Coordinación Estatal de Protección Civil de Yucatán (shelters, risk atlas)"
+    ],
+    "coordinates_note": "Coordinates mark the main settlement at risk (coastal port for municipalities listed with a locality in parentheses)."
+  },
+  "municipalities": [
+    {
+      "id": "progreso",
+      "name": "Progreso",
+      "locality": "Progreso",
+      "lat": 21.2817,
+      "lon": -89.6650,
+      "population": 66000,
+      "maya_speaking_pct": 6.0,
+      "coastal": true,
+      "flood_vulnerability": 0.78,
+      "shelter_capacity": 9000,
+      "elevation_m": 2
+    },
+    {
+      "id": "celestun",
+      "name": "Celestún",
+      "locality": "Celestún",
+      "lat": 20.8590,
+      "lon": -90.3990,
+      "population": 8200,
+      "maya_speaking_pct": 9.0,
+      "coastal": true,
+      "flood_vulnerability": 0.85,
+      "shelter_capacity": 1500,
+      "elevation_m": 2
+    },
+    {
+      "id": "hunucma",
+      "name": "Hunucmá (Sisal)",
+      "locality": "Sisal",
+      "lat": 21.1650,
+      "lon": -90.0310,
+      "population": 35000,
+      "maya_speaking_pct": 18.0,
+      "coastal": true,
+      "flood_vulnerability": 0.80,
+      "shelter_capacity": 4000,
+      "elevation_m": 3
+    },
+    {
+      "id": "rio_lagartos",
+      "name": "Río Lagartos",
+      "locality": "Río Lagartos",
+      "lat": 21.5970,
+      "lon": -88.1580,
+      "population": 3500,
+      "maya_speaking_pct": 12.0,
+      "coastal": true,
+      "flood_vulnerability": 0.82,
+      "shelter_capacity": 800,
+      "elevation_m": 2
+    },
+    {
+      "id": "tizimin",
+      "name": "Tizimín (El Cuyo)",
+      "locality": "El Cuyo",
+      "lat": 21.5160,
+      "lon": -87.6800,
+      "population": 80000,
+      "maya_speaking_pct": 38.0,
+      "coastal": true,
+      "flood_vulnerability": 0.70,
+      "shelter_capacity": 9000,
+      "elevation_m": 4
+    },
+    {
+      "id": "merida",
+      "name": "Mérida",
+      "locality": "Mérida",
+      "lat": 20.9670,
+      "lon": -89.6230,
+      "population": 995000,
+      "maya_speaking_pct": 6.5,
+      "coastal": false,
+      "flood_vulnerability": 0.35,
+      "shelter_capacity": 60000,
+      "elevation_m": 9
+    },
+    {
+      "id": "valladolid",
+      "name": "Valladolid",
+      "locality": "Valladolid",
+      "lat": 20.6890,
+      "lon": -88.2010,
+      "population": 85000,
+      "maya_speaking_pct": 40.0,
+      "coastal": false,
+      "flood_vulnerability": 0.30,
+      "shelter_capacity": 8000,
+      "elevation_m": 25
+    },
+    {
+      "id": "tekax",
+      "name": "Tekax",
+      "locality": "Tekax",
+      "lat": 20.2020,
+      "lon": -89.2880,
+      "population": 44000,
+      "maya_speaking_pct": 52.0,
+      "coastal": false,
+      "flood_vulnerability": 0.40,
+      "shelter_capacity": 5000,
+      "elevation_m": 40
+    }
+  ]
+}

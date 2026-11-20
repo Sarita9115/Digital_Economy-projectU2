@@ -1,0 +1,11 @@
+services:
+  ewrs:
+    build: .
+    image: yucatan-ewrs:latest
+    container_name: yucatan-ewrs
+    ports:
+      - "8501:8501"
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

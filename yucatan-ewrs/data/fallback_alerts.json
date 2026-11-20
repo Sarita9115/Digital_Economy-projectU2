@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "description": "Pre-approved alert templates used when the LLM is unavailable (no API key, API failure/timeout, Offline / Demo Mode, or telecom outage).",
+    "placeholders": ["{municipality}", "{locality}", "{category}", "{risk_level}", "{risk_score}", "{rainfall}", "{surge}", "{exposed}", "{top_factor}", "{hotline}"],
+    "maya_disclaimer": "Yucatec Maya texts are prototype drafts and require native-speaker / INDEMAYA validation before real deployment."
+  },
+  "risk_labels": {
+    "es": {"Low": "BAJO", "Moderate": "MODERADO", "High": "ALTO", "Critical": "CRÍTICO"},
+    "yua": {"Low": "CHAN SAJBE'ENTSIL", "Moderate": "SAJBE'ENTSIL", "High": "NOJOCH SAJBE'ENTSIL", "Critical": "JACH NOJOCH SAJBE'ENTSIL"},
+    "en": {"Low": "LOW", "Moderate": "MODERATE", "High": "HIGH", "Critical": "CRITICAL"}
+  },
+  "templates": {
+    "Critical": {
+      "es": {
+        "sms": "PROCIVY ALERTA {risk_level}: Huracán Cat {category} en {municipality}. EVACÚE YA al albergue oficial más cercano. Lleve documentos y agua. Emergencias {hotline}",
+        "whatsapp": "🔴 *ALERTA {risk_level} – {municipality}*\n\nHuracán categoría {category} con lluvias de {rainfall} mm en 24 h y marea de tormenta de hasta {surge} m. Nivel de riesgo: {risk_score}/100.\n\n*EVACUACIÓN OBLIGATORIA AHORA:*\n1️⃣ Diríjase al albergue oficial más cercano (lista PROCIVY).\n2️⃣ Lleve documentos en bolsa plástica, medicamentos, agua y linterna.\n3️⃣ Ayude a personas mayores, niñas, niños y personas con discapacidad.\n4️⃣ Corte la luz y el gas antes de salir.\n\n⚠️ Principal factor de riesgo: {top_factor}.\nNo cruce calles inundadas. Siga solo canales oficiales.\n📞 Emergencias: {hotline}",
+        "radio": "[SONIDO DE ALERTA] Atención, {municipality}. Protección Civil de Yucatán emite ALERTA {risk_level}. Un huracán categoría {category} se acerca con lluvias de {rainfall} milímetros y marea de tormenta de {surge} metros. La evacuación es OBLIGATORIA. Diríjase ahora mismo al albergue oficial más cercano. Lleve documentos, medicinas y agua. Ayude a sus vecinos mayores. No espere a que empiece el viento fuerte. Repetimos: evacúe ya. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY {risk_level}: Chak ik'al K{category} ku taal {municipality}. Jóok'en BEJLA'E' ti' albergue. Ch'a' a ju'unil yéetel ja'. Tel {hotline}",
+        "whatsapp": "🔴 *{risk_level} – {municipality}*\n\nChak ik'al (huracán) categoría {category} ku taal. Yaan ya'abach cháak ({rainfall} mm) yéetel u nojochtal k'áak'náab ({surge} m). Sajbe'entsil: {risk_score}/100.\n\n*K'A'ABET A JÓOK'OL BEJLA'E':*\n1️⃣ Xeen ti' u albergueil a kaajal (PROCIVY).\n2️⃣ Ch'a' a ju'unilo'ob, a ts'aako'ob, ja' yéetel linterna.\n3️⃣ Áant le nojoch máako'ob yéetel le paalalo'obo'.\n4️⃣ Tuup u sáasilil yéetel u gasil a wotoch.\n\n⚠️ U asab nojoch sajbe'entsil: {top_factor}.\nMa' a máan tu'ux yaan ja'. Ka'aj u'uyik chéen u t'aan Protección Civil.\n📞 {hotline}",
+        "radio": "[SONIDO DE ALERTA] U'uyej, kaaj {municipality}. Protección Civil Yucatán ku ya'alik: {risk_level}. Juntúul chak ik'al categoría {category} ku taal, yéetel {rainfall} milímetros cháak yéetel {surge} metros k'áak'náab. K'a'abet a jóok'ol bejla'e'. Xeen séeba'an ti' u albergueil a kaajal. Ch'a' a ju'unilo'ob, a ts'aako'ob yéetel ja'. Áant a nojoch láak'o'ob. Ma' a pa'atik u k'uchul u muuk' le iik'o'. Tu ka'atéen: jóok'en bejla'e'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY {risk_level} ALERT: Cat {category} hurricane, {municipality}. EVACUATE NOW to the nearest official shelter. Bring IDs and water. Emergency {hotline}",
+        "whatsapp": "🔴 *{risk_level} ALERT – {municipality}*\n\nCategory {category} hurricane with {rainfall} mm of rain in 24 h and storm surge up to {surge} m. Risk score: {risk_score}/100.\n\n*MANDATORY EVACUATION NOW:*\n1️⃣ Go to the nearest official shelter (PROCIVY list).\n2️⃣ Bring documents in a plastic bag, medicine, water and a flashlight.\n3️⃣ Help older adults, children and people with disabilities.\n4️⃣ Switch off power and gas before leaving.\n\n⚠️ Main risk driver: {top_factor}.\nDo not cross flooded streets. Follow official channels only.\n📞 Emergency: {hotline}",
+        "radio": "[ALERT TONE] Attention, {municipality}. Yucatán Civil Protection has issued a {risk_level} ALERT. A Category {category} hurricane is approaching with {rainfall} millimetres of rain and a {surge}-metre storm surge. Evacuation is MANDATORY. Go to the nearest official shelter right now. Bring documents, medicine and water. Help your elderly neighbours. Do not wait for strong winds to begin. Again: evacuate now. Emergency line: {hotline}."
+      }
+    },
+    "High": {
+      "es": {
+        "sms": "PROCIVY ALERTA {risk_level}: Huracán Cat {category}, {municipality}. Prepárese para evacuar. Zonas bajas: acudan al albergue. Emergencias {hotline}",
+        "whatsapp": "🟠 *ALERTA {risk_level} – {municipality}*\n\nHuracán categoría {category}. Lluvia esperada: {rainfall} mm/24 h · Marea de tormenta: {surge} m · Riesgo: {risk_score}/100.\n\n*PREPÁRESE PARA EVACUAR:*\n✅ Si vive en zona baja o costera, acuda al albergue oficial desde ahora.\n✅ Tenga lista su mochila de emergencia (documentos, medicinas, agua, radio de pilas).\n✅ Asegure techos, ventanas y objetos sueltos.\n✅ Cargue su celular y guarde números de emergencia.\n\n⚠️ Principal factor de riesgo: {top_factor}.\n📻 Escuche la radio comunitaria para actualizaciones.\n📞 Emergencias: {hotline}",
+        "radio": "[SONIDO DE ALERTA] Atención, {municipality}. Protección Civil de Yucatán emite ALERTA {risk_level} por huracán categoría {category}. Se esperan lluvias de {rainfall} milímetros y marea de tormenta de {surge} metros. Si vive en zona baja o cerca del mar, acuda ya al albergue oficial. Todos los demás: preparen su mochila con documentos, medicinas y agua, y aseguren techos y ventanas. Manténgase atento a esta frecuencia. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY {risk_level}: Chak ik'al K{category}, {municipality}. Líik'sa' a ba'alo'ob, yaan u jóok'ol. Tu'ux kaabal: xeen albergue. Tel {hotline}",
+        "whatsapp": "🟠 *{risk_level} – {municipality}*\n\nChak ik'al categoría {category}. Cháak: {rainfall} mm · K'áak'náab: {surge} m · Sajbe'entsil: {risk_score}/100.\n\n*LÍIK'SA' A BA'ALO'OB UTI'AL A JÓOK'OL:*\n✅ Wa kaajakbal tu jáal k'áak'náab wa tu'ux kaabal, xeen ti' albergue bejla'e'.\n✅ Ts'áa ichil a mochila: a ju'unilo'ob, ts'aak, ja' yéetel radio.\n✅ Ts'áa muuk' u yoot'el a wotoch yéetel u ventanailo'ob.\n✅ Ts'áa u muuk' a celular.\n\n⚠️ U asab nojoch sajbe'entsil: {top_factor}.\n📻 U'uy u radioil a kaajal.\n📞 {hotline}",
+        "radio": "[SONIDO DE ALERTA] U'uyej, kaaj {municipality}. Protección Civil Yucatán ku ya'alik {risk_level} tu yo'olal chak ik'al categoría {category}. Yaan {rainfall} milímetros cháak yéetel {surge} metros k'áak'náab. Wa kaajakbal tu jáal k'áak'náab, xeen bejla'e' ti' albergue. Tuláakal u jeel máako'ob: líik'sa' a mochila yéetel a ju'unilo'ob, ts'aak yéetel ja'. U'uy le radioa'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY {risk_level} ALERT: Cat {category} hurricane, {municipality}. Prepare to evacuate. Low-lying areas: go to shelter now. Emergency {hotline}",
+        "whatsapp": "🟠 *{risk_level} ALERT – {municipality}*\n\nCategory {category} hurricane. Expected rain: {rainfall} mm/24 h · Storm surge: {surge} m · Risk: {risk_score}/100.\n\n*PREPARE TO EVACUATE:*\n✅ If you live in a low-lying or coastal area, go to the official shelter now.\n✅ Keep your go-bag ready (documents, medicine, water, battery radio).\n✅ Secure roofs, windows and loose objects.\n✅ Charge your phone and save emergency numbers.\n\n⚠️ Main risk driver: {top_factor}.\n📻 Listen to community radio for updates.\n📞 Emergency: {hotline}",
+        "radio": "[ALERT TONE] Attention, {municipality}. Yucatán Civil Protection has issued a {risk_level} ALERT for a Category {category} hurricane. Expect {rainfall} millimetres of rain and a {surge}-metre storm surge. If you live in a low-lying or coastal area, go to the official shelter now. Everyone else: pack documents, medicine and water, and secure roofs and windows. Stay tuned to this station. Emergency line: {hotline}."
+      }
+    },
+    "Moderate": {
+      "es": {
+        "sms": "PROCIVY AVISO {risk_level}: Huracán Cat {category} cerca de {municipality}. Prepare su mochila y ubique su albergue. Info oficial: radio local. {hotline}",
+        "whatsapp": "🟡 *AVISO {risk_level} – {municipality}*\n\nHuracán categoría {category} en la región. Lluvia esperada: {rainfall} mm/24 h · Riesgo: {risk_score}/100.\n\n*MANTÉNGASE PREPARADO:*\n• Ubique el albergue oficial más cercano.\n• Prepare agua, alimentos no perecederos y medicinas para 3 días.\n• Limpie desagües y retire objetos que puedan volar.\n\n⚠️ Factor a vigilar: {top_factor}.\n📞 Emergencias: {hotline}",
+        "radio": "Atención, {municipality}. Protección Civil de Yucatán mantiene AVISO {risk_level} por huracán categoría {category}. Se esperan lluvias de hasta {rainfall} milímetros. Le pedimos ubicar su albergue más cercano, preparar agua, alimentos y medicinas para tres días, y limpiar los desagües de su calle. Siga esta frecuencia para nuevas indicaciones. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY {risk_level}: Chak ik'al K{category} naats' ti' {municipality}. Líik'sa' a mochila, kaxt a albergue. U'uy radio. Tel {hotline}",
+        "whatsapp": "🟡 *{risk_level} – {municipality}*\n\nChak ik'al categoría {category} yaan naats'. Cháak: {rainfall} mm · Sajbe'entsil: {risk_score}/100.\n\n*LÍIK'SA' A BA'ALO'OB:*\n• Kaxt tu'ux yaan u albergueil a kaajal.\n• Líik'sa' ja', janal yéetel ts'aak uti'al óoxp'éel k'iin.\n• Míis u bejil ja' yéetel ch'a' ba'alo'ob ku páajtal u xiik'nal.\n\n⚠️ Ilawil: {top_factor}.\n📞 {hotline}",
+        "radio": "U'uyej, kaaj {municipality}. Protección Civil Yucatán ku ya'alik {risk_level} tu yo'olal chak ik'al categoría {category}. Yaan tak {rainfall} milímetros cháak. Kaxt tu'ux yaan a albergue, líik'sa' ja', janal yéetel ts'aak uti'al óoxp'éel k'iin, yéetel míis u bejil ja' ti' a calle. U'uy le radioa'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY {risk_level} ADVISORY: Cat {category} hurricane near {municipality}. Pack a go-bag and locate your shelter. Updates on local radio. {hotline}",
+        "whatsapp": "🟡 *{risk_level} ADVISORY – {municipality}*\n\nCategory {category} hurricane in the region. Expected rain: {rainfall} mm/24 h · Risk: {risk_score}/100.\n\n*STAY PREPARED:*\n• Locate your nearest official shelter.\n• Store water, non-perishable food and medicine for 3 days.\n• Clear drains and remove objects that could become projectiles.\n\n⚠️ Factor to watch: {top_factor}.\n📞 Emergency: {hotline}",
+        "radio": "Attention, {municipality}. Yucatán Civil Protection maintains a {risk_level} ADVISORY for a Category {category} hurricane. Up to {rainfall} millimetres of rain are expected. Please locate your nearest shelter, store water, food and medicine for three days, and clear the drains on your street. Stay tuned to this station for further instructions. Emergency line: {hotline}."
+      }
+    },
+    "Low": {
+      "es": {
+        "sms": "PROCIVY INFORMA: Riesgo {risk_level} en {municipality} por huracán Cat {category}. Manténgase informado por canales oficiales. {hotline}",
+        "whatsapp": "🟢 *INFORMATIVO – {municipality}*\n\nRiesgo {risk_level} ({risk_score}/100) por huracán categoría {category}.\n\n• Revise su plan familiar de emergencia.\n• Tenga a la mano un radio de pilas.\n• Siga las actualizaciones oficiales de PROCIVY.\n\n📞 Emergencias: {hotline}",
+        "radio": "Buenas tardes, {municipality}. Protección Civil de Yucatán informa que el riesgo para su municipio es {risk_level} ante el huracán categoría {category}. No hay indicación de evacuación. Le recomendamos revisar su plan familiar de emergencia y mantenerse atento a esta frecuencia. Emergencias: {hotline}."
+      },
+      "yua": {
+        "sms": "PROCIVY: {risk_level} ti' {municipality} tu yo'olal chak ik'al K{category}. U'uy u t'aan Protección Civil. Tel {hotline}",
+        "whatsapp": "🟢 *K'A'AJSAJ T'AAN – {municipality}*\n\n{risk_level} ({risk_score}/100) tu yo'olal chak ik'al categoría {category}.\n\n• Xak'al a plan yéetel a láak'o'ob.\n• Ts'áa naats' juntúul radio yéetel pila.\n• U'uy u t'aan PROCIVY.\n\n📞 {hotline}",
+        "radio": "Ma'alob chíinil k'iin, kaaj {municipality}. Protección Civil Yucatán ku ya'alik {risk_level} ti' a kaajal tu yo'olal chak ik'al categoría {category}. Ma' k'a'abet a jóok'ol. Xak'al a plan yéetel a láak'o'ob yéetel u'uy le radioa'. Emergencias: {hotline}."
+      },
+      "en": {
+        "sms": "PROCIVY INFO: {risk_level} risk in {municipality} from Cat {category} hurricane. Stay informed through official channels. {hotline}",
+        "whatsapp": "🟢 *INFORMATION – {municipality}*\n\n{risk_level} risk ({risk_score}/100) from a Category {category} hurricane.\n\n• Review your family emergency plan.\n• Keep a battery-powered radio at hand.\n• Follow official PROCIVY updates.\n\n📞 Emergency: {hotline}",
+        "radio": "Good afternoon, {municipality}. Yucatán Civil Protection reports that the risk for your municipality is {risk_level} from the Category {category} hurricane. There is no evacuation order. We recommend reviewing your family emergency plan and staying tuned to this station. Emergency line: {hotline}."
+      }
+    }
+  }
+}
